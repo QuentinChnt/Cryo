@@ -8366,13 +8366,55 @@ function fbDisconnect() {
   toast(t('syncDisconnected'), 'success');
 }
 
+/* Normalise un littéral d'objet JS simple (clés nues, apostrophes, virgule
+   finale, commentaires) en JSON. Pure réécriture de texte : rien n'est exécuté. */
+function jsObjectLiteralToJson(src) {
+  let out = '', i = 0;
+  const n = src.length;
+  const isIdStart = c => /[A-Za-z_$]/.test(c);
+  const isId = c => /[A-Za-z0-9_$]/.test(c);
+  while (i < n) {
+    const c = src[i];
+    if (c === '/' && src[i+1] === '/') { while (i < n && src[i] !== '\n') i++; continue; }
+    if (c === '/' && src[i+1] === '*') { i += 2; while (i < n && !(src[i] === '*' && src[i+1] === '/')) i++; i += 2; continue; }
+    if (c === '"' || c === "'") {                       // chaîne : recopiée, apostrophes converties
+      const q = c; let raw = ''; i++;
+      while (i < n && src[i] !== q) {
+        if (src[i] === '\\') { raw += src[i] + (src[i+1] || ''); i += 2; continue; }
+        raw += src[i++];
+      }
+      i++;
+      if (q === "'") raw = raw.replace(/\\'/g, "'").replace(/"/g, '\\"');
+      out += '"' + raw + '"';
+      continue;
+    }
+    if (c === ',') {                                    // virgule finale : supprimée
+      let j = i + 1;
+      while (j < n && /\s/.test(src[j])) j++;
+      if (src[j] === '}' || src[j] === ']') { i++; continue; }
+      out += c; i++; continue;
+    }
+    if (isIdStart(c)) {                                 // clé nue : mise entre guillemets
+      let j = i; while (j < n && isId(src[j])) j++;
+      const word = src.slice(i, j);
+      let k = j; while (k < n && /\s/.test(src[k])) k++;
+      out += (src[k] === ':') ? '"' + word + '"' : word;   // sinon true / false / null
+      i = j; continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
 function parseFirebaseConfig(text) {
   const t2 = (text || '').trim();
   const brace = t2.indexOf('{'), end = t2.lastIndexOf('}');
-  if (brace === -1 || end === -1) throw new Error('no object found');
+  if (brace === -1 || end === -1 || end < brace) throw new Error('no object found');
   const objText = t2.slice(brace, end + 1);
   try { return JSON.parse(objText); } catch (_) {}
-  return (new Function('return (' + objText + ')'))();
+  // Le collage habituel est un littéral JS. On le convertit en JSON au lieu de
+  // l'évaluer : « new Function('return (' + objText + ')') » exécutait du code
+  // arbitraire venant du presse-papier.
+  return JSON.parse(jsObjectLiteralToJson(objText));
 }
 
 
@@ -8457,8 +8499,10 @@ function undo() {
   state.freezers = entry.snapshot.freezers;
   state.reagents = entry.snapshot.reagents;
   if (entry.snapshot.inventory) state.inventory = entry.snapshot.inventory;
-  // Remove the corresponding history entry too (the last one)
-  if (state.history.length) state.history.pop();
+  // Retire l'entree d'historique correspondante. logAction empile avec unshift
+  // (le plus recent en tete) : c'est donc shift() et non pop(), sinon l'annulation
+  // effacait la plus ANCIENNE trace et laissait celle de l'action annulee.
+  if (state.history.length) state.history.shift();
   // Validate view points to existing entities
   if (view.freezerId && !state.freezers.find(f => f.id === view.freezerId)) {
     view.freezerId = state.freezers[0]?.id || null;
@@ -8616,10 +8660,20 @@ async function appendLog(label) {
 async function _flushLog() {
   if (_logFlushing || !_logQueue.length || !_logHandle) return;
   _logFlushing = true;
-  const chunk = _logQueue.join('');
-  const ok = await _logWrite(chunk, true);
-  if (ok) _logQueue = [];       // sinon on garde en file pour réessayer
-  _logFlushing = false;
+  try {
+    // On ne retire QUE les lignes réellement écrites : « _logQueue = [] » vidait
+    // aussi celles empilées pendant l'await, qui étaient perdues sans trace
+    // (leur appelant avait vu le garde _logFlushing et rendu la main).
+    // La boucle draine ce qui est arrivé entre-temps.
+    while (_logQueue.length && _logHandle) {
+      const n = _logQueue.length;
+      const ok = await _logWrite(_logQueue.slice(0, n).join(''), true);
+      if (!ok) break;            // échec : on garde tout en file pour réessayer
+      _logQueue.splice(0, n);
+    }
+  } finally {
+    _logFlushing = false;
+  }
 }
 // Export manuel : marche dans tous les navigateurs
 function exportLogCsv() {
@@ -8957,18 +9011,21 @@ function wireAliquotGroups(container) {
   });
 }
 
+/* Renvoie du TEXTE BRUT, jamais du HTML : tous les appelants qui l'injectent
+   dans le DOM l'échappent eux-mêmes, et l'export CSV le veut brut. Échapper
+   ici en plus donnait « Tubes A&amp;B &lt;2024&gt; » à l'écran. */
 function locString(loc) {
   const f = getFreezer(loc.freezerId);
   if (!f) return '—';
   const z = f.zones.find(zz => zz.id === loc.zoneId);
   if (!z) return f.name;
   if (z.type === 'rack' && loc.boxRow != null) {
-    return `${f.name} · ${z.name} · Niv. ${dispLevel(loc.boxRow, z.rackHeight)} · Prof. ${loc.boxCol+1} · ${ROW_LABELS[loc.row]}${loc.col+1}`;
+    return `${f.name} · ${z.name} · Niv. ${dispLevel(loc.boxRow, z.rackHeight)} · Prof. ${loc.boxCol+1} · ${ROW_LABELS[loc.row]||(loc.row+1)}${loc.col+1}`;
   }
   if (z.type === 'compartment' && loc.compBoxId != null) {
     const box = getCompBox(z, loc.compBoxId);
     const cell = (loc.row != null) ? ` · ${ROW_LABELS[loc.row]||(loc.row+1)}${loc.col+1}` : '';
-    return `${f.name} · ${z.name} · ${box ? escapeHtml(box.label || t('compBoxDefault')) : t('compBoxDefault')}${cell}`;
+    return `${f.name} · ${z.name} · ${box ? (box.label || t('compBoxDefault')) : t('compBoxDefault')}${cell}`;
   }
   return `${f.name} · ${z.name}`;
 }
@@ -9133,6 +9190,10 @@ function renderSidebar() {
   fl.querySelectorAll('.freezer-item').forEach(el => {
     el.onclick = () => {
       view = {
+        // Choisir un congelateur amene sur sa carte : sans « tab », view.tab
+        // devenait undefined -> la classe body.tab-map sautait, le bouton
+        // Reorganiser disparaissait et l'onglet Carte perdait son etat actif.
+        tab: 'map',
         level: 'overview',
         freezerId: el.dataset.freezer,
         zoneId: null,
@@ -9399,9 +9460,16 @@ function openInvModal(id) {
   const it = id ? state.inventory.find(x => x.id === id) : null;
   document.getElementById('invModalTitle').textContent = id ? t('invModalTitleEdit') : t('invModalTitleAdd');
   const sel = document.getElementById('invCategory');
-  sel.innerHTML = INV_CATEGORIES.map(k => `<option value="${k}">${escapeHtml(invCatLabel(k))}</option>`).join('');
+  // La liste des consommables accepte des categories libres (renderInventory
+  // affiche toute categorie inconnue en fin de liste). Si celle de l'article
+  // n'est pas dans INV_CATEGORIES, on l'ajoute comme option : sinon sel.value
+  // ne prenait pas, et « Enregistrer » remplacait la categorie par la premiere
+  // de la liste — l'article disparaissait de sa section.
+  const cats = INV_CATEGORIES.slice();
+  if (it && it.category && !cats.includes(it.category)) cats.push(it.category);
+  sel.innerHTML = cats.map(k => `<option value="${k}">${escapeHtml(invCatLabel(k))}</option>`).join('');
   document.getElementById('invName').value = it ? it.name : '';
-  sel.value = it ? it.category : 'culture';
+  sel.value = (it && it.category) ? it.category : 'culture';
   document.getElementById('invUnit').value = it ? (it.unit || '') : '';
   document.getElementById('invQty').value = it ? it.qty : 0;
   document.getElementById('invLow').value = (it && it.lowThreshold != null) ? it.lowThreshold : '';
@@ -9513,7 +9581,16 @@ function zoneDisplayName(f, z, idx) {
       b.onclick=function(e){ e.stopPropagation(); menu.classList.remove('open');
         view.freezerId=b.dataset.fz; view.level='overview'; view.selectedReagentId=null; render(); };
     });
-    document.addEventListener('click', function(){ menu.classList.remove('open'); }, {once:true});
+    // Fermeture au clic extérieur : UN seul écouteur pour toute la vie de la page.
+    // Posé à chaque rendu et en {once:true}, il était consommé par le premier clic
+    // n'importe où — le menu ne se refermait donc plus aux ouvertures suivantes.
+    if(!window.__fzOutsideClick){
+      window.__fzOutsideClick = true;
+      document.addEventListener('click', function(e){
+        var m=document.getElementById('fzMenu');
+        if(m && m.classList.contains('open') && !m.contains(e.target)) m.classList.remove('open');
+      });
+    }
   }
 
 
@@ -9681,7 +9758,6 @@ function renderOverview(c, f) {
   });
 
   c.querySelectorAll('.crumb').forEach(el => el.onclick = () => navigateTo(el.dataset.go));
-  try { wireFreezerSwitch(); } catch(e) {}
   try { wireFreezerSwitch(); } catch(e) {}
 }
 
@@ -10884,6 +10960,10 @@ function reagentsInCompGrid(fId, zId) {
 function compGridFreeCells(fId, z, count, excludeId) {
   const { rows, cols } = compGridDims(z);
   const occ = new Set(reagentsInCompGrid(fId, z.id).filter(r => r.id !== excludeId).map(r => r.loc.cellRow + ',' + r.loc.cellCol));
+  // Les cases prises par une boîte ne sont pas libres : les ignorer faisait
+  // atterrir un nouvel objet sous une boîte, d'où un déplacement surprise au
+  // rendu suivant (et un débordement non détecté en saisie en lot).
+  (z.compBoxes || []).forEach(b => { if (b.slotRow != null) occ.add(b.slotRow + ',' + b.slotCol); });
   const out = [];
   for (let r = 0; r < rows && out.length < count; r++) for (let cc = 0; cc < cols && out.length < count; cc++) {
     if (!occ.has(r + ',' + cc)) out.push({ row: r, col: cc });
@@ -10891,32 +10971,69 @@ function compGridFreeCells(fId, z, count, excludeId) {
   return out;
 }
 function renderCompartmentGrid(c, f, z) {
-  const dims = compGridDims(z);
-  const rows = dims.rows, cols = dims.cols;
   if (!z.compBoxes) z.compBoxes = [];
   const boxes = z.compBoxes;
   const loose = reagentsInCompGrid(f.id, z.id);
+  // Filet de sécurité : une grille trop petite pour son contenu (données importées,
+  // synchro, état ancien) laissait des objets sans case, donc invisibles alors
+  // qu'ils restaient en base. On ajoute les lignes manquantes plutôt que de les
+  // perdre de vue — un compartiment n'a pas de contrainte physique de taille.
+  {
+    let d0 = compGridDims(z);
+    const need = boxes.length + loose.length;
+    if (need > d0.rows * d0.cols) {
+      const grown = Math.min(26, Math.ceil(need / d0.cols));
+      if (grown > d0.rows) {
+        z.gridRows = grown;
+        saveState();
+        if (typeof toast === 'function') toast(lang === 'en'
+          ? `Compartment grid enlarged to ${z.gridRows}×${z.gridCols} to show all ${need} items`
+          : `Grille du compartiment agrandie en ${z.gridRows}×${z.gridCols} pour afficher les ${need} éléments`,
+          'warn', 5000);
+      }
+    }
+  }
+  const dims = compGridDims(z);
+  const rows = dims.rows, cols = dims.cols;
   const slots = rows * cols;
 
   // Placer ce qui n'a pas encore d'emplacement
   {
-    const taken = new Set();
-    boxes.forEach(b => { if (b.slotRow != null) taken.add(b.slotRow + ',' + b.slotCol); });
-    loose.forEach(it => { if (it.loc.cellRow != null) taken.add(it.loc.cellRow + ',' + it.loc.cellCol); });
     let moved = false;
-    boxes.concat([]).forEach(b => {
+    // Les boîtes tiennent leur case en premier : c'est elles qui gagnent au
+    // rendu (`box ? null : loose.find(...)`), donc leurs cases sont réservées.
+    const boxCells = new Set();
+    boxes.forEach(b => {
+      if (b.slotRow != null && b.slotRow < rows && b.slotCol < cols) boxCells.add(b.slotRow + ',' + b.slotCol);
+    });
+    const taken = new Set(boxCells);
+    // Une case déjà prise par une boîte n'est pas « occupée » par l'objet qui
+    // s'y trouve : celui-ci devra bouger, on ne compte donc pas sa case.
+    loose.forEach(it => {
+      if (it.loc.cellRow == null) return;
+      const k = it.loc.cellRow + ',' + it.loc.cellCol;
+      if (it.loc.cellRow < rows && it.loc.cellCol < cols && !boxCells.has(k)) taken.add(k);
+    });
+    const firstFree = () => {
+      for (let r = 0; r < rows; r++) for (let cc = 0; cc < cols; cc++)
+        if (!taken.has(r + ',' + cc)) return { r, cc };
+      return null;
+    };
+    boxes.forEach(b => {
       if (b.slotRow != null && b.slotRow < rows && b.slotCol < cols) return;
-      outer0: for (let r = 0; r < rows; r++) for (let cc = 0; cc < cols; cc++)
-        if (!taken.has(r + ',' + cc)) { b.slotRow = r; b.slotCol = cc; taken.add(r + ',' + cc); moved = true; break outer0; }
+      const s = firstFree();
+      if (!s) return;
+      b.slotRow = s.r; b.slotCol = s.cc; boxCells.add(s.r + ',' + s.cc); taken.add(s.r + ',' + s.cc); moved = true;
     });
     loose.forEach(it => {
-      const busy = boxes.some(b => b.slotRow === it.loc.cellRow && b.slotCol === it.loc.cellCol);
-      if (it.loc.cellRow != null && it.loc.cellRow < rows && it.loc.cellCol < cols && !busy) return;
-      outer1: for (let r = 0; r < rows; r++) for (let cc = 0; cc < cols; cc++)
-        if (!taken.has(r + ',' + cc)) {
-          if (it.loc.cellRow != null) taken.delete(it.loc.cellRow + ',' + it.loc.cellCol);
-          it.loc.cellRow = r; it.loc.cellCol = cc; taken.add(r + ',' + cc); moved = true; break outer1;
-        }
+      const k = it.loc.cellRow + ',' + it.loc.cellCol;
+      if (it.loc.cellRow != null && it.loc.cellRow < rows && it.loc.cellCol < cols && !boxCells.has(k)) return;
+      const s = firstFree();
+      if (!s) return;
+      // On ne libère JAMAIS l'ancienne case ici : la version précédente faisait
+      // `taken.delete(anciennecase)`, ce qui rendait « libre » une case tenue par
+      // une boîte — l'objet suivant s'y installait et redevenait invisible.
+      it.loc.cellRow = s.r; it.loc.cellCol = s.cc; taken.add(s.r + ',' + s.cc); moved = true;
     });
     if (moved) saveState();
   }
@@ -11150,12 +11267,27 @@ async function openCompGridResizeModal(freezerId, zoneId) {
   if (!m) { if (typeof toast === 'function') toast(lang==='en'?'Invalid format (use 4x6)':'Format invalide (ex. 4x6)','warn'); return; }
   const nr = Math.max(1, Math.min(26, parseInt(m[1]))), nc = Math.max(1, Math.min(26, parseInt(m[2])));
   const boxes = (z.compBoxes || []);
-  if (nr * nc < boxes.length) { if (typeof toast === 'function') toast((lang==='en'?'Too small: ':'Trop petit : ')+boxes.length+(lang==='en'?' boxes to place':' boîtes à placer'),'warn'); return; }
+  const loose = reagentsInCompGrid(freezerId, zoneId);
+  // Le garde-fou ne comptait que les boîtes : les objets posés directement dans
+  // le compartiment débordaient en silence, restaient dans state.reagents et
+  // n'étaient plus rendus nulle part — introuvables et indéplaçables.
+  const need = boxes.length + loose.length;
+  if (nr * nc < need) {
+    if (typeof toast === 'function') toast(lang==='en'
+      ? `Too small: ${nr}×${nc} = ${nr*nc} slots for ${need} to place (${boxes.length} box${boxes.length>1?'es':''} + ${loose.length} item${loose.length>1?'s':''})`
+      : `Trop petit : ${nr}×${nc} = ${nr*nc} emplacements pour ${need} à placer (${boxes.length} boîte${boxes.length>1?'s':''} + ${loose.length} objet${loose.length>1?'s':''})`,
+      'warn');
+    return;
+  }
   pushUndo(t('btnEditBoxSize'));
   z.gridRows = nr; z.gridCols = nc;
+  // Boîtes d'abord, puis objets libres, dans l'ordre de lecture : ainsi aucune
+  // boîte ne vient s'asseoir sur la case d'un objet déjà placé.
   const ordered = boxes.slice().sort((a,b) => (a.slotRow??0) - (b.slotRow??0) || (a.slotCol??0) - (b.slotCol??0));
   let idx = 0;
   ordered.forEach(b => { b.slotRow = Math.floor(idx / nc); b.slotCol = idx % nc; idx++; });
+  loose.slice().sort((a,b) => (a.loc.cellRow??0) - (b.loc.cellRow??0) || (a.loc.cellCol??0) - (b.loc.cellCol??0))
+       .forEach(r => { r.loc.cellRow = Math.floor(idx / nc); r.loc.cellCol = idx % nc; idx++; });
   saveState(); render();
 }
 
@@ -12446,8 +12578,19 @@ function findAvailableSpots(freezer, parsedLoc, count) {
           }
         }
       }
+    } else if (zone.gridMode !== false) {
+      // Compartiment en grille : borné par les cases RÉELLEMENT libres. Sans
+      // cela on annonçait « 10 placés » dans un compartiment de 4 cases, et le
+      // surplus se retrouvait sans emplacement, donc invisible.
+      const need = count - spots.length;
+      compGridFreeCells(freezer.id, zone, need, null).forEach(cell => {
+        spots.push({ freezerId: freezer.id, zoneId: zone.id, zoneName: zone.name,
+                     cellRow: cell.row, cellCol: cell.col });
+      });
+      if (spots.length >= count) break;
     } else {
-      // Compartment — fill remaining slots
+      // Compartiment en scène libre : la grille de rendu s'étend avec le nombre
+      // d'éléments, il n'y a donc pas de capacité à respecter.
       const need = count - spots.length;
       for (let i = 0; i < need; i++) {
         spots.push({ freezerId: freezer.id, zoneId: zone.id, zoneName: zone.name });
@@ -12518,7 +12661,9 @@ function analyzeBulkCommand() {
                    : (_zz && _zz.rackHeight ? dispLevel(s.boxRow, _zz.rackHeight) : s.boxRow+1);
         label += ` · ${nivShort} ${_lvl} · ${profShort} ${s.boxCol+1} · ${ROW_LABELS[s.row]||(s.row+1)}${s.col+1}`;
       } else {
-        label += ` ${t('bulkInOpenCompartment')}`;
+        label += (s.cellRow != null)
+          ? ` · ${ROW_LABELS[s.cellRow]||(s.cellRow+1)}${s.cellCol+1}`
+          : ` ${t('bulkInOpenCompartment')}`;
       }
       html += `<div>${escapeHtml(label)}</div>`;
     });
@@ -12555,6 +12700,11 @@ function applyBulkCommand() {
       reagent.loc.boxCol = spot.boxCol;
       reagent.loc.row = spot.row;
       reagent.loc.col = spot.col;
+    } else if (spot.cellRow != null) {
+      // Case de grille de compartiment réservée par findAvailableSpots
+      reagent.loc.cellRow = spot.cellRow;
+      reagent.loc.cellCol = spot.cellCol;
+      reagent.loc.shape = guessShape(lastParsedCommand.name, type);
     } else {
       reagent.loc.shape = guessShape(lastParsedCommand.name, type);
     }
@@ -12719,27 +12869,146 @@ function updateLayoutGrid() {
   });
   renderLayoutEditor();
 }
-function saveLayout() {
-  pushUndo(t('historyLayout', {name: editingFreezer.name}));
-  editingFreezer.name = document.getElementById('layoutName').value.trim() || (lang === 'fr' ? 'Congélateur' : 'Freezer');
-  editingFreezer.temp = document.getElementById('layoutTemp').value.trim();
-  editingFreezer.cols = Math.max(1, parseInt(document.getElementById('layoutCols').value)||1);
-  editingFreezer.rows = Math.max(1, parseInt(document.getElementById('layoutRows').value)||1);
+/* Replace les aliquots d'un rack redimensionné, SANS collision.
+   Le calcul est pur : il renvoie les nouvelles positions et ce qui ne rentre
+   plus, sans rien modifier — l'appelant peut donc l'utiliser pour prévenir
+   l'utilisateur avant d'appliquer.
+   (Avant, saveLayout se contentait d'un Math.min sur chaque coordonnée : deux
+   aliquots pouvaient atterrir sur la même case, et un seul restait visible.) */
+function planRackRepack(zone, items) {
+  const H = Math.max(1, zone.rackHeight || 1), D = Math.max(1, zone.rackDepth || 1);
+  const placements = new Map(), unplaced = [];
+  // 1. Regroupement par boîte, après recadrage de la boîte dans le nouveau rack
+  const byBox = new Map();
+  items.forEach(r => {
+    const br = Math.min(Math.max(0, r.loc.boxRow ?? 0), H - 1);
+    const bc = Math.min(Math.max(0, r.loc.boxCol ?? 0), D - 1);
+    const k = br + ',' + bc;
+    if (!byBox.has(k)) byBox.set(k, { br, bc, list: [] });
+    byBox.get(k).list.push(r);
+  });
+  // 2. Dans chaque boîte : on garde la position quand elle tient et reste libre,
+  //    on tasse le reste sur les cases libres.
+  const occupied = new Map();   // "br,bc" -> Set("row,col")
+  const overflow = [];
+  byBox.forEach(g => {
+    const d = boxDims(zone, g.br, g.bc);
+    const occ = new Set();
+    occupied.set(g.br + ',' + g.bc, occ);
+    const needCell = [];
+    g.list.forEach(r => {
+      const row = r.loc.row, col = r.loc.col;
+      const fits = row != null && col != null && row < d.gridRows && col < d.gridCols;
+      if (fits && !occ.has(row + ',' + col)) {
+        placements.set(r.id, { boxRow: g.br, boxCol: g.bc, row, col });
+        occ.add(row + ',' + col);
+      } else needCell.push(r);
+    });
+    needCell.forEach(r => {
+      for (let row = 0; row < d.gridRows; row++) for (let col = 0; col < d.gridCols; col++) {
+        if (!occ.has(row + ',' + col)) {
+          placements.set(r.id, { boxRow: g.br, boxCol: g.bc, row, col });
+          occ.add(row + ',' + col);
+          return;
+        }
+      }
+      overflow.push(r);   // boîte pleine : on tentera ailleurs dans le rack
+    });
+  });
+  // 3. Débordements : première case libre trouvée dans le rack, sinon non replacé
+  overflow.forEach(r => {
+    for (let br = 0; br < H; br++) for (let bc = 0; bc < D; bc++) {
+      const key = br + ',' + bc;
+      let occ = occupied.get(key);
+      if (!occ) { occ = new Set(); occupied.set(key, occ); }
+      const d = boxDims(zone, br, bc);
+      for (let row = 0; row < d.gridRows; row++) for (let col = 0; col < d.gridCols; col++) {
+        if (!occ.has(row + ',' + col)) {
+          placements.set(r.id, { boxRow: br, boxCol: bc, row, col });
+          occ.add(row + ',' + col);
+          return;
+        }
+      }
+    }
+    unplaced.push(r);
+  });
+  return { placements, unplaced };
+}
+
+async function saveLayout() {
+  const newName = document.getElementById('layoutName').value.trim() || (lang === 'fr' ? 'Congélateur' : 'Freezer');
+  const newTemp = document.getElementById('layoutTemp').value.trim();
+  const newCols = Math.max(1, parseInt(document.getElementById('layoutCols').value)||1);
+  const newRows = Math.max(1, parseInt(document.getElementById('layoutRows').value)||1);
   const existing = state.freezers.findIndex(f => f.id === editingFreezer.id);
+  // Réduire la grille (ou faire chevaucher une zone) supprime des zones du plan,
+  // et avec elles TOUS leurs aliquots. C'était silencieux : on demande maintenant
+  // confirmation, en nommant les zones et le nombre d'aliquots en jeu.
+  const en = (lang === 'en');
+  let plans = null, deleted = [];
+  if (existing >= 0) {
+    const keptZoneIds = new Set(editingFreezer.zones.map(z => z.id));
+    const lostZones = state.freezers[existing].zones.filter(z => !keptZoneIds.has(z.id));
+    const mine = state.reagents.filter(r => r.loc.freezerId === editingFreezer.id);
+    deleted = mine.filter(r => !keptZoneIds.has(r.loc.zoneId));
+    // Replacement des racks rétrécis, calculé à blanc pour pouvoir l'annoncer
+    plans = new Map();
+    let dropped = 0;
+    editingFreezer.zones.forEach(z => {
+      if (z.type !== 'rack') return;
+      const inZone = mine.filter(r => r.loc.zoneId === z.id && r.loc.boxRow != null);
+      if (!inZone.length) return;
+      const plan = planRackRepack(z, inZone);
+      plans.set(z.id, plan);
+      dropped += plan.unplaced.length;
+    });
+    // Un seul avertissement, qui dit tout ce qui va être perdu
+    if (deleted.length || dropped || lostZones.length) {
+      const zoneNames = lostZones.map(z => z.name).filter(Boolean);
+      const listed = zoneNames.slice(0, 4).join(', ') + (zoneNames.length > 4 ? '…' : '');
+      const lines = [];
+      if (lostZones.length) lines.push(en
+        ? `${lostZones.length} zone${lostZones.length>1?'s':''} no longer fit the grid: ${listed}.`
+        : `${lostZones.length} zone${lostZones.length>1?'s':''} ne tiennent plus dans la grille : ${listed}.`);
+      if (deleted.length) lines.push(en
+        ? `${deleted.length} aliquot${deleted.length>1?'s':''} stored there will be DELETED.`
+        : `${deleted.length} aliquot${deleted.length>1?'s':''} qui y sont rangés seront SUPPRIMÉS.`);
+      if (dropped) lines.push(en
+        ? `${dropped} more aliquot${dropped>1?'s':''} no longer fit in their resized rack and will be DELETED too.`
+        : `${dropped} aliquot${dropped>1?'s':''} de plus ne rentrent plus dans leur rack redimensionné et seront aussi SUPPRIMÉS.`);
+      if (deleted.length || dropped) lines.push(en
+        ? 'Undo (Ctrl+Z) remains available.'
+        : 'L\'annulation (Ctrl+Z) reste possible.');
+      if (!deleted.length && !dropped) lines.push(en ? 'Nothing is stored there.' : 'Rien n\'y est rangé.');
+      const ok = await customConfirm(
+        en ? 'Confirm the new layout' : 'Confirmer le nouveau plan',
+        lines.join(' '),
+        (deleted.length || dropped) ? (en ? 'Delete and save' : 'Supprimer et enregistrer')
+                                    : (en ? 'Save' : 'Enregistrer'));
+      if (!ok) {
+        // updateLayoutGrid a déjà retiré les zones du BROUILLON au fil de la
+        // saisie : sans cette remise à plat, refuser laissait l'éditeur amputé
+        // alors que rien n'a été enregistré. On repart de l'état réel.
+        openLayoutEditor(editingFreezer.id);
+        return;
+      }
+    }
+  }
+  editingFreezer.name = newName;
+  editingFreezer.temp = newTemp;
+  editingFreezer.cols = newCols;
+  editingFreezer.rows = newRows;
+  pushUndo(t('historyLayout', {name: editingFreezer.name}));
   if (existing >= 0) {
     const validZoneIds = new Set(editingFreezer.zones.map(z => z.id));
+    const drop = new Set(deleted.map(r => r.id));
+    plans.forEach(p => p.unplaced.forEach(r => drop.add(r.id)));
     state.reagents = state.reagents.map(r => {
       if (r.loc.freezerId !== editingFreezer.id) return r;
-      if (!validZoneIds.has(r.loc.zoneId)) return null;
-      const z = editingFreezer.zones.find(zz => zz.id === r.loc.zoneId);
-      if (z.type === 'rack' && r.loc.boxRow != null) {
-        const newLoc = {...r.loc};
-        newLoc.boxRow = Math.min(newLoc.boxRow, z.rackHeight-1);
-        newLoc.boxCol = Math.min(newLoc.boxCol ?? 0, z.rackDepth-1);
-        newLoc.row = Math.min(newLoc.row, z.gridRows-1);
-        newLoc.col = Math.min(newLoc.col, z.gridCols-1);
-        return {...r, loc: newLoc};
-      }
+      if (!validZoneIds.has(r.loc.zoneId) || drop.has(r.id)) return null;
+      const plan = plans.get(r.loc.zoneId);
+      const pl = plan && plan.placements.get(r.id);
+      if (pl) return {...r, loc: {...r.loc, boxRow: pl.boxRow, boxCol: pl.boxCol, row: pl.row, col: pl.col}};
       return r;
     }).filter(Boolean);
     state.freezers[existing] = editingFreezer;
@@ -12915,7 +13184,9 @@ function exportData() {
   a.href = url;
   a.download = `cryomap-${new Date().toISOString().slice(0,10)}.json`;
   a.click();
-  URL.revokeObjectURL(url);
+  // Révoquer dans le même tour de boucle annule le téléchargement sur certains
+  // navigateurs : on laisse le temps au transfert de démarrer (cf. exportLogCsv).
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
   toast(t('toastExport'), 'success');
 }
 /* ---- Notion-ready CSV export ---- */
@@ -12933,7 +13204,7 @@ function downloadText(filename, text, mime) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);   // idem : sinon le transfert peut être coupé
 }
 function exportInventoryCSV() {
   const inv = state.inventory || [];
@@ -12981,7 +13252,7 @@ function importData(file) {
       migrateState(state);
       logAction('historyImport', {nF: data.freezers.length, nR: data.reagents.length, sF: data.freezers.length>1?'s':'', sR: data.reagents.length>1?'s':''});
       saveState();
-      view = { level: 'overview', freezerId: state.freezers[0]?.id, zoneId: null, boxRow: null, boxCol: null, compBoxId: null, selectedReagentId: null, compBoxId: null, filter: { owner: null, type: null, expiringOnly: false, half: null }, selectMode: false, selectedIds: new Set(), pendingBulkMove: null, selectedBoxes: new Set(), reorganizeMode: false, repositionMode: false, boxSelectMode: false };
+      view = { tab: 'map', level: 'overview', freezerId: state.freezers[0]?.id, zoneId: null, boxRow: null, boxCol: null, selectedReagentId: null, compBoxId: null, filter: { owner: null, type: null, expiringOnly: false, half: null }, selectMode: false, selectedIds: new Set(), pendingBulkMove: null, selectedBoxes: new Set(), reorganizeMode: false, repositionMode: false, boxSelectMode: false };
       toast(t('toastImport'), 'success');
       render();
     } catch (err) { toast(t('toastImportErr', {msg: err.message}), 'danger'); }
@@ -13315,13 +13586,27 @@ function deleteLiveZone(freezerId, zoneId){
       if(s.norm) d.norm=s.norm;
       if(s.tubesOv&&typeof s.tubesOv==="object") d.tubesOv=s.tubesOv;
       if(Array.isArray(s.sources)) d.sources=s.sources;
+      // Ces quatre-là étaient écrits par savePrep sans jamais figurer dans
+      // prepSnapshot : « J'ai déjà », les cases cochées et les emplacements
+      // choisis repartaient de zéro à chaque rechargement, alors même que la
+      // validation les exige.
+      if(s.checks&&typeof s.checks==="object") d.checks=s.checks;
+      if(s.excluded&&typeof s.excluded==="object") d.excluded=s.excluded;
+      if(s.allowExpired) d.allowExpired=true;
+      // PREP_SPOT / PREP_LINK sont déclarés plus bas : on garde la valeur ici
+      // et on les amorce après leur initialisation.
+      if(s.spotChoice&&typeof s.spotChoice==="object") d._spotChoice=s.spotChoice;
+      if(s.linkChoice&&typeof s.linkChoice==="object") d._linkChoice=s.linkChoice;
       if(Array.isArray(s.fluids)&&s.fluids.length){
         d.fluids=s.fluids.map(function(f){ var o={}; for(var k in f) o[k]=f[k]; o.id=uidp(); return o; });
       }
     } }catch(e){}
     return d;
   }
-  function prepSnapshot(){ return {plates:prep.plates,mode:prep.mode,excess:prep.excess,minPrep:prep.minPrep,maxPrep:prep.maxPrep,minPip:prep.minPip,load:prep.load,tubesOv:prep.tubesOv||{},norm:prep.norm,sources:prep.sources||[],fluids:prep.fluids.map(function(f){return {drug:f.drug,dil:f.dil,load:f.load,sol:f.sol,conc:f.conc,unit:f.unit,src:f.src||null,srcId:f.srcId||null};})}; }
+  function prepSnapshot(){ return {plates:prep.plates,mode:prep.mode,excess:prep.excess,minPrep:prep.minPrep,maxPrep:prep.maxPrep,minPip:prep.minPip,load:prep.load,tubesOv:prep.tubesOv||{},norm:prep.norm,sources:prep.sources||[],
+    checks:prep.checks||{}, excluded:prep.excluded||{}, allowExpired:!!prep.allowExpired,
+    spotChoice:(typeof PREP_SPOT!=="undefined"&&PREP_SPOT)||{}, linkChoice:(typeof PREP_LINK!=="undefined"&&PREP_LINK)||{},
+    fluids:prep.fluids.map(function(f){return {drug:f.drug,dil:f.dil,load:f.load,sol:f.sol,conc:f.conc,unit:f.unit,src:f.src||null,srcId:f.srcId||null};})}; }
   function savePrep(){ try{ localStorage.setItem(PKEY, JSON.stringify(prepSnapshot())); }catch(e){} }
   // Partage équipe : écrit la prépa dans l'état synchronisé (Firebase)
   function sharePrep(){
@@ -13591,7 +13876,13 @@ function deleteLiveZone(freezerId, zoneId){
       var key=(lo.zone||"?")+"|"+(lo.niveau||"")+"|"+(lo.prof||"");
       var nk=normDrug(name); var e=byName[nk]; if(!e){ e=byName[nk]={name:name,total:0,spots:{},dil:drugDiluent(name)}; }
       if(r.alias&&!e.alias) e.alias=r.alias; if(r.code&&!e.code) e.code=r.code;
-      e.total += (r.units!=null && r.units>0) ? r.units : 1;   // « aliquotes restantes » if(e.aliqVol==null){ var _av=parseAliqVol(r.quantity); if(_av) e.aliqVol=_av; }
+      e.total += (r.units!=null && r.units>0) ? r.units : 1;   // « aliquotes restantes »
+      // Repli de volume par aliquot, tous emplacements confondus : sert quand
+      // l'emplacement retenu n'a pas de volume sur sa fiche (sinon on retombait
+      // sur les 10 µL supposes alors qu'un autre aliquot du meme produit le porte).
+      // Le « if » vivait auparavant sur la ligne du commentaire ci-dessus, donc
+      // avale par le // : e.aliqVol n'etait jamais renseigne.
+      if(e.aliqVol==null){ var _av=parseAliqVol(r.quantity); if(_av) e.aliqVol=_av; }
       var sp=e.spots[key]||{key:key,lo:lo,cnt:0,items:[],vol:null}; sp.cnt++;
       if(sp.vol==null){ var _sv=parseAliqVol(r.quantity); if(_sv) sp.vol=_sv; } sp.items.push({id:r.id,expiry:r.expiry||null,lot:r.lot||null,aliquotDate:r.aliquotDate||null,row:(r.loc&&r.loc.row!=null)?r.loc.row:null,col:(r.loc&&r.loc.col!=null)?r.loc.col:null}); e.spots[key]=sp; });
     var map={}; Object.keys(byName).forEach(function(k){ var e=byName[k]; var best=Object.keys(e.spots).map(function(kk){return e.spots[kk];}).sort(function(a,b){return b.cnt-a.cnt;})[0]; var allSpots=Object.keys(e.spots).map(function(kk){return e.spots[kk];}).sort(function(a,b){return b.cnt-a.cnt;});map[k]={name:e.name,stock:e.total,loc:best?best.lo:null,spots:allSpots,diluent:e.dil,code:e.code||null,alias:e.alias||null,aliqVol:e.aliqVol||null}; });
@@ -13605,6 +13896,11 @@ function deleteLiveZone(freezerId, zoneId){
 
   var PREP_SPOT={};   // nom normalise -> CLE de l'emplacement choisi (zone|niveau|prof)
   var PREP_LINK={};   // nom du .tdd -> cle produit de l'inventaire (association manuelle)
+  // Amorcage depuis le stockage : ces deux tables sont declarees APRES
+  // loadPrep(), donc leur initialisation a {} ecrasait toute valeur restauree.
+  // loadPrep les met de cote dans prep._spotChoice / _linkChoice, on les reprend ici.
+  if(prep._spotChoice){ for(var _sk in prep._spotChoice) PREP_SPOT[_sk]=prep._spotChoice[_sk]; delete prep._spotChoice; }
+  if(prep._linkChoice){ for(var _lk in prep._linkChoice) PREP_LINK[_lk]=prep._linkChoice[_lk]; delete prep._linkChoice; }
   // Les surcharges de tubes vivent dans prep.tubesOv : une variable separee
   // declaree apres loadPrep() aurait ecrase les valeurs restaurees.
   function prepTubes(){ if(!prep.tubesOv) prep.tubesOv={}; return prep.tubesOv; }
@@ -14115,6 +14411,7 @@ function deleteLiveZone(freezerId, zoneId){
         sel.addEventListener("change",function(e){ e.stopPropagation();
           var kk=sel.getAttribute("data-linkkey");
           if(sel.value==="") delete PREP_LINK[kk]; else PREP_LINK[kk]=sel.value;
+          savePrep();   // le choix doit survivre au rechargement
           renderResults();
         });
       });
@@ -14124,12 +14421,13 @@ function deleteLiveZone(freezerId, zoneId){
           var vsel=sel.value;
           if(vsel==="") delete PREP_SPOT[sel.getAttribute("data-spotkey")];
           else PREP_SPOT[sel.getAttribute("data-spotkey")]=vsel;   // cle stable
+          savePrep();   // le choix doit survivre au rechargement
           renderResults();
         });
       });
     }
     var rc=document.getElementById("p-recipes"); if(rc) rc.innerHTML=recipesHTML(valid);
-    document.querySelectorAll("#p-grab [data-tog], #p-recipes [data-tog]").forEach(function(el){ el.onclick=function(){ var k=el.getAttribute("data-tog"); prep.checks[k]=!prep.checks[k]; renderResults(); }; });
+    document.querySelectorAll("#p-grab [data-tog], #p-recipes [data-tog]").forEach(function(el){ el.onclick=function(){ var k=el.getAttribute("data-tog"); prep.checks[k]=!prep.checks[k]; savePrep(); renderResults(); }; });
     document.querySelectorAll("#p-grab [data-excl]").forEach(function(el){ el.onclick=function(ev){ ev.stopPropagation(); prep.excluded[el.getAttribute("data-excl")]=true; savePrep(); renderResults(); }; });
     document.querySelectorAll("#p-grab [data-incl]").forEach(function(el){ el.onclick=function(ev){ ev.stopPropagation(); delete prep.excluded[el.getAttribute("data-incl")]; savePrep(); renderResults(); }; });
   }
@@ -14150,6 +14448,17 @@ function deleteLiveZone(freezerId, zoneId){
   }
   function refillFluids(){ var tb=document.getElementById("p-fluidBody"); if(tb){ tb.innerHTML=fluidRowsHTML(); wireFluidRows(); } fillDatalist(); updatePanelSub(); }
   function updatePanelSub(){ var s=document.getElementById("p-panelsub"); if(s) s.textContent=LF("panelSub",{n:prep.fluids.length}); }
+
+  // Remise a zero complete d'un run : tubesOv, checks, allowExpired et les
+  // choix d'emplacement restaient en place et contaminaient le run suivant
+  // (comptes de tubes forces, cases deja cochees).
+  function resetPrepRun(){
+    prep.fluids=[]; prep.norm=null; prep.excluded={}; prep.sources=[];
+    prep.checks={}; prep.tubesOv={}; prep.allowExpired=false;
+    for(var k in PREP_SPOT) delete PREP_SPOT[k];
+    for(var k2 in PREP_LINK) delete PREP_LINK[k2];
+    try{ savePrep(); }catch(e){}
+  }
 
   async function validateRun(){
     var en=(lang==="en");
@@ -14240,6 +14549,12 @@ function deleteLiveZone(freezerId, zoneId){
     var ok=true;
     if(typeof customConfirm==="function") ok=await customConfirm(L("confirmTitle"),summary,L("confirmBtn"),true);
     if(!ok) return;
+    // L'etat a pu changer pendant que la fenetre etait ouverte (autre onglet,
+    // synchro equipe) : on recalcule avant de retirer, sinon le retrait portait
+    // sur des identifiants d'aliquots tires d'un instantane perime.
+    results = groupResults().filter(function(r){return !r.empty && r.hasData && r.inv && r.tubes!=null && !prep.excluded[(r.name||"").trim().toLowerCase()];});
+    total = results.reduce(function(a,r){return a+r.tubes;},0);
+    if(total===0){ if(typeof toast==="function") toast(L("nothingRemove"),"warn"); return; }
     if(typeof pushUndo==="function") pushUndo("Run D300e · "+total+" tube(s)");
     // Retrait des aliquots : on part des identifiants REELS de l'emplacement choisi
     // (et non d'une comparaison de noms), on decremente les entrees multi-aliquots
@@ -14287,7 +14602,7 @@ function deleteLiveZone(freezerId, zoneId){
       toast((lang==="en"?"Not enough stock for: ":"Stock insuffisant pour : ")+shortages.slice(0,3).join(", "),"warn");
     }
     if(typeof logAction==="function") logAction("historyPrepValidate",{list:histList,n:total});
-    prep.fluids=[]; prep.norm=null; prep.excluded={}; prep.sources=[]; savePrep();
+    resetPrepRun();
     saveState(); render();
     if(typeof toast==="function") toast(LF("toastValidated",{n:total}),"success");
   }
@@ -14374,13 +14689,13 @@ function deleteLiveZone(freezerId, zoneId){
             + (un.length>3?" \u2026":"") + (lang==="en"?" \u00b7 "+parsed.length+" others OK":" \u00b7 "+parsed.length+" autres OK");
         } else { note.className="p-note ok";
           note.textContent="\u2713 "+parsed.length+(lang==="en"?" fluids \u00b7 exact D300e load volumes":" fluides \u00b7 charges D300e exactes"); } } tf.value=""; }; rd.readAsText(file); }; } })();
-    document.getElementById("p-clear").onclick=function(){ prep.fluids=[]; prep.norm=null; prep.excluded={}; prep.sources=[]; savePrep(); refillFluids(); renderResults(); };
+    document.getElementById("p-clear").onclick=function(){ resetPrepRun(); refillFluids(); renderResults(); };
 
     renderResults();
   }
 
   window.renderPrepTab=renderPrepTab;
-  window.__clearPrep=function(){ if(!prep.fluids.length && !prep.norm) return; prep.fluids=[]; prep.norm=null; prep.excluded={}; prep.sources=[]; try{ savePrep(); }catch(e){} if(typeof view!=="undefined" && view.tab==="prep"){ if(typeof refillFluids==="function") refillFluids(); if(typeof renderResults==="function") renderResults(); } };
+  window.__clearPrep=function(){ if(!prep.fluids.length && !prep.norm) return; resetPrepRun(); if(typeof view!=="undefined" && view.tab==="prep"){ if(typeof refillFluids==="function") refillFluids(); if(typeof renderResults==="function") renderResults(); } };
   var tp=document.getElementById("tabPrep"); if(tp) tp.onclick=function(){ if(view.tab!=="prep"){ view.tab="prep"; render(); } };
 })();
 
