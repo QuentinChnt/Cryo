@@ -269,9 +269,10 @@
     padding:2px 7px; border-radius:var(--r-xs); }
   .p-tu-foot .tf-add b { font-weight:750; font-variant-numeric:tabular-nums; }
   .p-tu-foot .tf-add .ta-op { opacity:.55; }
-    background:var(--paper-2); color:var(--ink-3); font-size:8.5px; font-weight:700;
-    letter-spacing:.03em; cursor:help; }
-    margin-top:2px; cursor:help; }
+  /* Deux blocs de declarations orphelins (leur selecteur avait disparu)
+     vivaient ici. Le navigateur les ignorait en se resynchronisant, mais
+     c'est exactement la forme qui avait produit l'agrandissement au survol
+     de l'inventaire : autant ne pas laisser tourner ce genre de reste. */
   /* Vehicules a preparer : meme langage que les cartes de drogues */
   /* ===== Validation de run ===== */
   .vr-wrap { font-size:12.5px; }
@@ -503,8 +504,7 @@
     *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
   }
   /* Sécurité : réactif présent à plusieurs emplacements */
-    padding: 8px 10px; margin-bottom: 6px; }
-    color: var(--warn); margin-bottom: 6px; }
+  /* (deux blocs orphelins retirés ici — même cas que ci-dessus) */
   .p-spotsel, .p-spotsel-warn { font-size: 11px; font-family: var(--mono); padding: 4px 6px;
     border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: var(--paper); color: var(--ink-2);
     max-width: 200px; width: 100%; cursor: pointer; }
@@ -528,7 +528,6 @@
   .detail .detail-card, .detail .info-card {
     background: var(--paper);
   }
-  .sidebar .side-section, .detail > * { }
   .canvas::-webkit-scrollbar, .sidebar::-webkit-scrollbar, .detail::-webkit-scrollbar { width: 9px; }
   .canvas::-webkit-scrollbar-thumb, .sidebar::-webkit-scrollbar-thumb, .detail::-webkit-scrollbar-thumb {
     background: var(--rule-2); border-radius: var(--r-sm); border: 2px solid transparent; background-clip: content-box;
@@ -2242,6 +2241,14 @@ header.topbar { background: var(--paper); border-bottom: 1px solid var(--rule-2)
    118 px, d'où l'impression d'agrandissement (même effet sur .info-card,
    .item-card et .cg-card). Le min-height réel de .cg-card est défini plus bas
    (112 px), qui l'emportait déjà au repos : rien à conserver ici. */
+
+/* Bandeau d'echec d'enregistrement : le seul message permanent de l'app.
+   Il reste a l'ecran tant que rien n'est ecrit, contrairement a un toast. */
+#persistBanner { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+  background: #8a1c1c; color: #fff; padding: 12px 18px; font-size: 13px;
+  font-weight: 600; text-align: center; letter-spacing: 0.01em;
+  box-shadow: 0 -2px 14px rgba(0,0,0,0.25); }
+body.has-persist-banner { padding-bottom: 46px; }
 
 /* ---------- Pastilles & états : sobres, sans halo ---------- */
 .pill { background: var(--paper-2); border: 1px solid var(--rule-2); color: var(--ink-2);
@@ -4286,7 +4293,7 @@ header.topbar .topbar-actions{margin-left:auto!important;margin-right:0!importan
 
 /* ---------- Bande de statistiques retirée : l'info est déjà dans l'en-tête
    « Sortir du congélateur » (tubes · produits · exemplaires). ---------- */
-#p-statband{display:none!important}
+
 
 /* ---------- Barre du haut : réellement collée aux bords ---------- */
 header.topbar{padding:0 10px!important;gap:10px!important}
@@ -5454,7 +5461,7 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- Reagent modal -->
-<div class="modal-backdrop" id="reagentModal">
+<div class="modal-backdrop" id="reagentModal" role="dialog" aria-modal="true" aria-labelledby="reagentModalTitle">
   <div class="modal">
     <div class="modal-header">
       <div>
@@ -5581,11 +5588,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Layout editor -->
-<div class="modal-backdrop" id="layoutModal">
+<div class="modal-backdrop" id="layoutModal" role="dialog" aria-modal="true" aria-labelledby="layoutModalTitle">
   <div class="modal wide">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="layoutTitle">Plan du congélateur</div>
+        <div class="modal-title" id="layoutModalTitle" data-i18n="layoutTitle">Plan du congélateur</div>
         <div class="modal-sub" data-i18n="layoutSub">Définissez la disposition des zones</div>
       </div>
       <button class="modal-close" data-close-modal="layoutModal" aria-label="Close">×</button>
@@ -5625,7 +5632,7 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Zone editor -->
-<div class="modal-backdrop" id="zoneModal">
+<div class="modal-backdrop" id="zoneModal" role="dialog" aria-modal="true" aria-labelledby="zoneModalTitle">
   <div class="modal">
     <div class="modal-header">
       <div>
@@ -5691,11 +5698,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Bulk command modal -->
-<div class="modal-backdrop" id="cmdModal">
+<div class="modal-backdrop" id="cmdModal" role="dialog" aria-modal="true" aria-labelledby="cmdModalTitle">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="bulkTitle">Saisie en lot</div>
+        <div class="modal-title" id="cmdModalTitle" data-i18n="bulkTitle">Saisie en lot</div>
         <div class="modal-sub" data-i18n="bulkSub">Décrivez ce que vous voulez ranger, en français naturel</div>
       </div>
       <button class="modal-close" data-close-modal="cmdModal" aria-label="Close">×</button>
@@ -5740,11 +5747,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Settings -->
-<div class="modal-backdrop" id="settingsModal">
+<div class="modal-backdrop" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
   <div class="modal" style="max-width:500px">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="settingsTitle">Préférences</div>
+        <div class="modal-title" id="settingsModalTitle" data-i18n="settingsTitle">Préférences</div>
         <div class="modal-sub" data-i18n="settingsSub">Personnalisation de l'interface</div>
       </div>
       <button class="modal-close" data-close-modal="settingsModal" aria-label="Close">×</button>
@@ -5762,6 +5769,15 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
           <span data-i18n="settingsColorByType">Colorer les positions par type</span>
         </label>
         <div class="form-hint" style="margin-left:28px" data-i18n="settingsColorByTypeHint">Chaque type de réactif (Anticorps, Enzyme…) reçoit une couleur stable. Plus facile à scanner visuellement.</div>
+      </div>
+      <hr class="form-divider">
+      <div class="form-group">
+        <label class="form-label" for="settingsExpirySoon" data-i18n="settingsExpirySoon">Alerte « bientôt périmé »</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="number" min="0" max="365" step="1" id="settingsExpirySoon" class="form-input" style="max-width:110px" value="30">
+          <span class="form-hint" style="margin:0" data-i18n="settingsExpirySoonUnit">jours avant la date de péremption</span>
+        </div>
+        <div class="form-hint" data-i18n="settingsExpirySoonHint">Un aliquot passe en « bientôt périmé » ce nombre de jours avant sa date. Vaut pour la carte, le nettoyage et la préparation D300e.</div>
       </div>
       <hr class="form-divider">
       <div class="form-group">
@@ -5810,11 +5826,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
     </div>
   </div>
 </div>
-<div class="modal-backdrop" id="historyModal">
+<div class="modal-backdrop" id="historyModal" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
   <div class="modal" style="max-width:720px">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="historyTitle">Historique des modifications</div>
+        <div class="modal-title" id="historyModalTitle" data-i18n="historyTitle">Historique des modifications</div>
         <div class="modal-sub" data-i18n="historySub">Toutes les actions enregistrées sur ce poste</div>
       </div>
       <button class="modal-close" data-close-modal="historyModal" aria-label="Close">×</button>
@@ -5831,11 +5847,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Cleanup mode -->
-<div class="modal-backdrop" id="cleanupModal">
+<div class="modal-backdrop" id="cleanupModal" role="dialog" aria-modal="true" aria-labelledby="cleanupModalTitle">
   <div class="modal" style="max-width:680px">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="cleanupTitle">Mode nettoyage</div>
+        <div class="modal-title" id="cleanupModalTitle" data-i18n="cleanupTitle">Mode nettoyage</div>
         <div class="modal-sub" data-i18n="cleanupSub">Réactifs expirés ou bientôt expirés — sélectionnez ceux à supprimer</div>
       </div>
       <button class="modal-close" data-close-modal="cleanupModal" aria-label="Close">×</button>
@@ -5850,11 +5866,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Multi-tab reload prompt -->
-<div class="modal-backdrop" id="multitabModal">
+<div class="modal-backdrop" id="multitabModal" role="dialog" aria-modal="true" aria-labelledby="multitabModalTitle">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="multiTabTitle">Données modifiées ailleurs</div>
+        <div class="modal-title" id="multitabModalTitle" data-i18n="multiTabTitle">Données modifiées ailleurs</div>
       </div>
     </div>
     <div class="modal-body">
@@ -5868,14 +5884,14 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Bulk change owner -->
-<div class="modal-backdrop" id="sidePanelModal">
+<div class="modal-backdrop" id="sidePanelModal" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:560px">
     <div class="modal-header"><span class="modal-title"></span>
       <button class="btn ghost sm" data-close-modal="sidePanelModal">×</button></div>
     <div class="modal-body"></div>
   </div>
 </div>
-<div class="modal-backdrop" id="cellChoiceModal">
+<div class="modal-backdrop" id="cellChoiceModal" role="dialog" aria-modal="true" aria-labelledby="cellChoiceTitle">
   <div class="modal" style="max-width:400px">
     <div class="modal-header">
       <div>
@@ -5892,11 +5908,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
     </div>
   </div>
 </div>
-<div class="modal-backdrop" id="bulkOwnerModal">
+<div class="modal-backdrop" id="bulkOwnerModal" role="dialog" aria-modal="true" aria-labelledby="bulkOwnerModalTitle">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="bulkEditTitle">Modifier la sélection</div>
+        <div class="modal-title" id="bulkOwnerModalTitle" data-i18n="bulkEditTitle">Modifier la sélection</div>
         <div class="modal-sub" id="bulkOwnerSub"></div>
       </div>
       <button class="modal-close" data-close-modal="bulkOwnerModal" aria-label="Close">×</button>
@@ -5970,7 +5986,7 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Bulk box resize -->
-<div class="modal-backdrop" id="bulkResizeModal">
+<div class="modal-backdrop" id="bulkResizeModal" role="dialog" aria-modal="true" aria-labelledby="bulkResizeTitle">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
       <div>
@@ -6000,11 +6016,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Bulk move selection to another box -->
-<div class="modal-backdrop" id="bulkMoveModal">
+<div class="modal-backdrop" id="bulkMoveModal" role="dialog" aria-modal="true" aria-labelledby="bulkMoveModalTitle">
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="bulkMoveTitle">Déplacer la sélection vers une autre boîte</div>
+        <div class="modal-title" id="bulkMoveModalTitle" data-i18n="bulkMoveTitle">Déplacer la sélection vers une autre boîte</div>
         <div class="modal-sub" id="bulkMoveSubText"></div>
       </div>
       <button class="modal-close" data-close-modal="bulkMoveModal" aria-label="Close">×</button>
@@ -6038,11 +6054,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Move/swap box -->
-<div class="modal-backdrop" id="moveBoxModal">
+<div class="modal-backdrop" id="moveBoxModal" role="dialog" aria-modal="true" aria-labelledby="moveBoxModalTitle">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="moveBoxTitle">Déplacer ou échanger la boîte</div>
+        <div class="modal-title" id="moveBoxModalTitle" data-i18n="moveBoxTitle">Déplacer ou échanger la boîte</div>
         <div class="modal-sub" id="moveBoxSubText"></div>
       </div>
       <button class="modal-close" data-close-modal="moveBoxModal" aria-label="Close">×</button>
@@ -6068,7 +6084,7 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Box size config -->
-<div class="modal-backdrop" id="boxConfigModal">
+<div class="modal-backdrop" id="boxConfigModal" role="dialog" aria-modal="true" aria-labelledby="boxConfigTitle">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
       <div>
@@ -6099,7 +6115,7 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
   </div>
 </div>
 
-<div class="modal-backdrop" id="invModal">
+<div class="modal-backdrop" id="invModal" role="dialog" aria-modal="true" aria-labelledby="invModalTitle">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
       <div>
@@ -6157,7 +6173,7 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Confirm -->
-<div class="modal-backdrop" id="confirmModal">
+<div class="modal-backdrop" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
       <div>
@@ -6175,11 +6191,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 </div>
 
 <!-- Help -->
-<div class="modal-backdrop" id="helpModal">
+<div class="modal-backdrop" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
   <div class="modal">
     <div class="modal-header">
       <div>
-        <div class="modal-title" data-i18n="helpTitle">Guide d'utilisation</div>
+        <div class="modal-title" id="helpModalTitle" data-i18n="helpTitle">Guide d'utilisation</div>
         <div class="modal-sub" data-i18n="helpSub">Comprendre l'outil en 30 secondes</div>
       </div>
       <button class="modal-close" data-close-modal="helpModal" aria-label="Close">×</button>
@@ -6209,6 +6225,10 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
    ============================================================ */
 const STORAGE_KEY = 'cryomap-v3';
 const ROW_LABELS = 'ABCDEFGHIJKLMNOPQRST';
+/* Seuil « bientôt périmé », en jours. Paramètre central pour un labo : il
+   vivait en dur dans expiryStatus, il est maintenant dans les préférences.
+   Déclaré ici parce que migrateState() le lit dès l'initialisation du module. */
+const EXPIRY_SOON_DEFAULT = 30;
 
 /* ============================================================
    I18N — FR / EN translations
@@ -6507,6 +6527,9 @@ const I18N = {
     invFQty: 'Quantité en stock', invFLow: 'Seuil d\'alerte (stock mini)', invFLowPh: 'ex. 2', invFRef: 'Référence', invFRefPh: 'ex. 31966047', invFSupplier: 'Fournisseur', invFSupplierPh: 'ex. LifeTechnologies', invFNotes: 'Notes', invFNotesPh: 'emplacement, remarque…',
     invNameRequired: 'Le nom est requis', invDeleteTitle: 'Supprimer l\'article', invDeleteText: 'Supprimer « {name} » de l\'inventaire ?',
     invResetTitle: 'Recharger la liste par défaut', invResetText: 'Cela remplacera l\'inventaire actuel par la liste type. Continuer ?',
+    settingsExpirySoon: 'Alerte « bientôt périmé »',
+    settingsExpirySoonUnit: 'jours avant la date de péremption',
+    settingsExpirySoonHint: 'Un aliquot passe en « bientôt périmé » ce nombre de jours avant sa date. Vaut pour la carte, le nettoyage et la préparation D300e.',
     settingsNotion: 'Export pour Notion',
     syncRecoveryTitle: 'En cas de souci de données', syncForcePush: 'Envoyer mes données vers le cloud', syncForcePushHint: 'Si le cloud est vide ou faux : remplace le cloud par les données de CE poste (lancez-le depuis le poste qui a les bonnes données).', syncForcePushBtn: 'Envoyer', syncForcePushConfirm: 'Cela remplacera les données du cloud par celles de ce poste ({nR} réactifs). Vos collègues recevront cette version. Continuer ?', syncForcePushDone: 'Données envoyées vers le cloud', syncForcePull: 'Recharger depuis le cloud', syncForcePullHint: 'Remplace les données de ce poste par celles du cloud.', syncForcePullBtn: 'Recharger', syncForcePullConfirm: 'Cela remplacera les données de CE poste par celles du cloud. Continuer ?', syncForcePullDone: 'Données rechargées depuis le cloud', syncCloudEmpty: 'Le cloud est vide — utilisez plutôt « Envoyer mes données »', syncNotConnected: 'Non connecté à Firebase',
     syncSection: 'Synchronisation d\'équipe (Firebase)', syncHint: 'Partage les données en temps réel entre les postes. Collez la config Firebase de votre projet et choisissez un identifiant de labo commun.', syncConnect: 'Connecter & synchroniser', syncDisconnect: 'Déconnecter ce poste', syncConnectedLabel: 'Connecté · labo', syncRoom: 'Identifiant du labo', syncRoomPh: 'ex. labo-oncologie', syncConfigPh: '{ "apiKey": "...", "projectId": "...", "appId": "..." }', syncAnon: 'Connexion anonyme (recommandé)', syncWarn: '⚠ Dernier-qui-écrit-gagne sur l\'ensemble : évitez d\'éditer le même élément au même instant.', syncOff: 'Hors-ligne', syncConnecting: 'Connexion…', syncSyncing: 'Synchro…', syncSynced: 'Synchronisé', syncError: 'Erreur synchro', syncNoSdk: 'SDK Firebase non chargé (vérifiez la connexion internet).', syncInitError: 'Échec de connexion Firebase :', syncBadConfig: 'Configuration Firebase invalide.', syncNeedRoom: 'Indiquez un identifiant de labo.', syncConnectedToast: 'Synchro d\'équipe activée', syncDisconnected: 'Synchro désactivée sur ce poste', settingsNotionHint: 'Génère des fichiers CSV importables dans Notion (un par base de données).', settingsExportInv: 'Inventaire → CSV Notion', settingsExportReagents: 'Réactifs & emplacements → CSV Notion', toastExportInv: 'Inventaire exporté ({n} articles) — importez le CSV dans Notion', toastExportReagents: 'Réactifs exportés ({n}) — importez le CSV dans Notion',
@@ -6950,6 +6973,9 @@ const I18N = {
     invFQty: 'Stock quantity', invFLow: 'Alert threshold (min stock)', invFLowPh: 'e.g. 2', invFRef: 'Reference', invFRefPh: 'e.g. 31966047', invFSupplier: 'Supplier', invFSupplierPh: 'e.g. LifeTechnologies', invFNotes: 'Notes', invFNotesPh: 'location, note…',
     invNameRequired: 'Name is required', invDeleteTitle: 'Delete item', invDeleteText: 'Delete "{name}" from inventory?',
     invResetTitle: 'Reload default list', invResetText: 'This will replace the current inventory with the default list. Continue?',
+    settingsExpirySoon: 'Expiring-soon alert',
+    settingsExpirySoonUnit: 'days before the expiry date',
+    settingsExpirySoonHint: 'An aliquot turns "expiring soon" this many days before its date. Applies to the map, cleanup and the D300e prep.',
     settingsNotion: 'Export to Notion',
     syncRecoveryTitle: 'If data looks wrong', syncForcePush: 'Push my data to the cloud', syncForcePushHint: 'If the cloud is empty or wrong: replaces the cloud with THIS machine data (run it from the machine that has the good data).', syncForcePushBtn: 'Push', syncForcePushConfirm: 'This will replace the cloud data with this machine ({nR} reagents). Your team will receive this version. Continue?', syncForcePushDone: 'Data pushed to the cloud', syncForcePull: 'Reload from the cloud', syncForcePullHint: 'Replaces this machine data with the cloud version.', syncForcePullBtn: 'Reload', syncForcePullConfirm: 'This will replace THIS machine data with the cloud version. Continue?', syncForcePullDone: 'Data reloaded from the cloud', syncCloudEmpty: 'The cloud is empty — use Push my data instead', syncNotConnected: 'Not connected to Firebase',
     syncSection: 'Team sync (Firebase)', syncHint: 'Shares data in real time across machines. Paste your project\'s Firebase config and pick a lab ID shared by the team.', syncConnect: 'Connect & sync', syncDisconnect: 'Disconnect this machine', syncConnectedLabel: 'Connected · lab', syncRoom: 'Lab ID', syncRoomPh: 'e.g. onco-lab', syncConfigPh: '{ "apiKey": "...", "projectId": "...", "appId": "..." }', syncAnon: 'Anonymous sign-in (recommended)', syncWarn: '⚠ Last-write-wins on the whole dataset: avoid editing the same item at the same instant.', syncOff: 'Offline', syncConnecting: 'Connecting…', syncSyncing: 'Syncing…', syncSynced: 'Synced', syncError: 'Sync error', syncNoSdk: 'Firebase SDK not loaded (check your internet connection).', syncInitError: 'Firebase connection failed:', syncBadConfig: 'Invalid Firebase configuration.', syncNeedRoom: 'Enter a lab ID.', syncConnectedToast: 'Team sync enabled', syncDisconnected: 'Sync disabled on this machine', settingsNotionHint: 'Generates CSV files you can import into Notion (one per database).', settingsExportInv: 'Inventory → Notion CSV', settingsExportReagents: 'Reagents & locations → Notion CSV', toastExportInv: 'Inventory exported ({n} items) — import the CSV into Notion', toastExportReagents: 'Reagents exported ({n}) — import the CSV into Notion',
@@ -7140,6 +7166,7 @@ function applyStaticTranslations() {
 function openSettings() {
   document.getElementById('settingsInitials').value = state.preferences?.initials || '';
   document.getElementById('settingsColorByType').checked = !!state.preferences?.colorByType;
+  document.getElementById('settingsExpirySoon').value = expirySoonDays();
   // Reflect Firebase sync state
   const cfg = fbLoadConfig();
   const connected = !!(cfg && cfg.config && cfg.room);
@@ -7154,6 +7181,10 @@ function saveSettings() {
   state.preferences = state.preferences || {};
   state.preferences.initials = initials;
   state.preferences.colorByType = colorByType;
+  const soonRaw = document.getElementById('settingsExpirySoon').value.trim();
+  const soon = parseInt(soonRaw, 10);
+  state.preferences.expirySoonDays = (soonRaw !== '' && isFinite(soon) && soon >= 0)
+    ? Math.min(365, soon) : EXPIRY_SOON_DEFAULT;
   saveState();
   document.getElementById('settingsModal').classList.remove('show');
   render();
@@ -8061,10 +8092,13 @@ const INV_CATEGORIES = ['culture', 'supplement', 'growth', 'ecm', 'antibiotic', 
 
 function migrateState(s) {
   if (!s.history) s.history = [];
+  // identifiants de journal : requis par la synchro « un document par entree »
+  s.history.forEach(h => { if (h && !h.id) h.id = 'h' + (h.ts || Date.now()) + Math.random().toString(36).slice(2, 7); });
   if (!s.inventory) s.inventory = seedInventory();
   if (!s.preferences) s.preferences = { colorByType: false, initials: '' };
   if (s.preferences.colorByType == null) s.preferences.colorByType = false;
   if (s.preferences.initials == null) s.preferences.initials = '';
+  if (s.preferences.expirySoonDays == null) s.preferences.expirySoonDays = EXPIRY_SOON_DEFAULT;
   s.freezers.forEach(f => {
     // Ensure every zone has w/h
     f.zones.forEach(z => {
@@ -8089,6 +8123,28 @@ function migrateState(s) {
       }
     }
   });
+}
+
+/* Au demarrage on lit le miroir localStorage (synchrone, l'app s'affiche tout
+   de suite), puis on verifie si IndexedDB porte une revision plus recente —
+   ce qui arrive precisement quand le miroir avait sature. */
+async function adoptNewerPersistedState() {
+  let mirrorRev = 0;
+  try { mirrorRev = Number(localStorage.getItem(STORAGE_REV_KEY)) || 0; } catch (e) {}
+  const rec = await kvGet('state');
+  if (!rec || !rec.json || !(rec.rev > mirrorRev)) return false;
+  try {
+    const s = JSON.parse(rec.json);
+    if (!s || !s.freezers || !s.reagents) return false;
+    migrateState(s);
+    state = s;
+    _reagentIndex = null;
+    render();
+    toast(lang === 'en'
+      ? 'Recovered the latest saved data (the browser quota had blocked the mirror)'
+      : 'Dernières données enregistrées récupérées (le quota du navigateur bloquait le miroir)', 'warn', 6000);
+    return true;
+  } catch (e) { return false; }
 }
 
 function loadState() {
@@ -8143,29 +8199,172 @@ function normalizeLocs() {
   return fixed;
 }
 
+/* ============================================================
+   STOCKAGE DURABLE — IndexedDB en principal, localStorage en miroir
+
+   localStorage plafonne a ~5 Mo par origine. A 2 563 aliquots, l'etat pesait
+   deja 848 Ko et les 3 sauvegardes automatiques portaient le total a 3,8 Mo,
+   soit 78 % du quota : au-dela, setItem echouait, un toast passait trois
+   secondes et l'application continuait de tourner avec des donnees JAMAIS
+   ecrites. Un rechargement perdait tout le travail depuis la derniere
+   ecriture reussie, sans que rien ne l'ait signale.
+
+   IndexedDB n'a pas ce plafond et devient le magasin de reference.
+   localStorage reste ecrit en miroir pour deux raisons : il se lit de facon
+   synchrone au demarrage (donc l'app s'affiche sans attendre), et il porte
+   l'evenement `storage` sur lequel repose la detection multi-onglets.
+   Si le miroir echoue, les donnees sont saines dans IndexedDB et on continue.
+   Si les DEUX echouent, un bandeau permanent le dit — plus de perte muette.
+   ============================================================ */
+const IDB_NAME = 'cryomap_store', IDB_STORE = 'kv';
+const STORAGE_REV_KEY = STORAGE_KEY + '-rev';
+let _kvDb = null, _kvBroken = false;
+function kvOpen() {
+  if (_kvBroken) return Promise.reject(new Error('IndexedDB indisponible'));
+  if (_kvDb) return Promise.resolve(_kvDb);
+  return new Promise((res, rej) => {
+    let rq;
+    try { rq = indexedDB.open(IDB_NAME, 1); } catch (e) { _kvBroken = true; return rej(e); }
+    rq.onupgradeneeded = () => { try { rq.result.createObjectStore(IDB_STORE); } catch (e) {} };
+    rq.onsuccess = () => { _kvDb = rq.result; res(_kvDb); };
+    rq.onerror = () => { _kvBroken = true; rej(rq.error); };
+  });
+}
+function kvSet(key, val) {
+  return kvOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => res(true);
+    tx.onerror = () => rej(tx.error);
+    tx.onabort = () => rej(tx.error);
+  }));
+}
+function kvGet(key) {
+  return kvOpen().then(db => new Promise(res => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const r = tx.objectStore(IDB_STORE).get(key);
+    r.onsuccess = () => res(r.result == null ? null : r.result);
+    r.onerror = () => res(null);
+  })).catch(() => null);
+}
+
+/* Bandeau permanent : le seul message qui ne disparait pas tout seul, parce
+   qu'il annonce que le travail en cours n'est pas enregistre. */
+let _persistBanner = null;
+function showPersistFailure(msg) {
+  if (!_persistBanner) {
+    _persistBanner = document.createElement('div');
+    _persistBanner.id = 'persistBanner';
+    _persistBanner.setAttribute('role', 'alert');
+    document.body.appendChild(_persistBanner);
+  }
+  _persistBanner.textContent = msg;
+  _persistBanner.style.display = '';
+  document.body.classList.add('has-persist-banner');
+}
+function clearPersistFailure() {
+  if (_persistBanner) _persistBanner.style.display = 'none';
+  document.body.classList.remove('has-persist-banner');
+}
+
+let _persistTimer = null, _persistDirty = false;
+const PERSIST_DEBOUNCE = 250;
+
+/* Ecriture reelle. Une seule serialisation, partagee par les deux magasins. */
+function persistNow() {
+  _persistDirty = false;
+  clearTimeout(_persistTimer); _persistTimer = null;
+  let json;
+  try { json = JSON.stringify(state); }
+  catch (e) { showPersistFailure(lang === 'en'
+      ? 'Cannot serialise the data — nothing is being saved. Export a JSON backup now.'
+      : 'Données non sérialisables — rien n\'est enregistré. Exporte une sauvegarde JSON tout de suite.'); return; }
+  const rev = Date.now();
+  let mirrorOk = false;
+  try {
+    localStorage.setItem(STORAGE_KEY, json);
+    localStorage.setItem(STORAGE_REV_KEY, String(rev));
+    mirrorOk = true;
+  } catch (e) {
+    // Quota atteint : le miroir reste sur son ancienne valeur, donc sa
+    // revision aussi — au prochain demarrage IndexedDB sera reconnu plus recent.
+    console.warn('[CryoMap] miroir localStorage sature, IndexedDB prend le relais', e && e.name);
+  }
+  kvSet('state', { rev, json })
+    .then(() => clearPersistFailure())
+    .catch(err => {
+      console.error('[CryoMap] echec IndexedDB', err);
+      if (!mirrorOk) showPersistFailure(lang === 'en'
+        ? 'SAVING FAILED — your changes are only in this page. Export a JSON backup before closing.'
+        : 'ENREGISTREMENT IMPOSSIBLE — tes modifications ne sont que dans cette page. Exporte une sauvegarde JSON avant de fermer.');
+    });
+}
+/* Ecriture groupee : une operation en lot appelait saveState() en boucle, soit
+   une serialisation de 848 Ko par aliquot touche (59 ms chacune). */
+function schedulePersist() {
+  _persistDirty = true;
+  if (_persistTimer) return;
+  _persistTimer = setTimeout(persistNow, PERSIST_DEBOUNCE);
+}
+/* Vidage immediat : fermeture d'onglet, export, import, avant un push distant. */
+function flushPersist() { if (_persistDirty) persistNow(); }
+
 function saveState() {
   try { normalizeLocs(); } catch (e) {}
   _reagentIndex = null; // invalidate cached index after any persisted mutation
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-  catch (e) { toast('Erreur sauvegarde : ' + e.message, 'danger'); }
+  schedulePersist();
   if (typeof fbSchedulePush === 'function') fbSchedulePush();
 }
 function uid() { return 'x' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36); }
 
 /* ============================================================
-   FIREBASE — real-time team sync (whole-state document)
+   SYNCHRONISATION D'EQUIPE — un document PAR ENTITE
+
+   L'ancien modele ecrivait tout l'etat dans un seul document :
+     cryomap/{salle} = { state: JSON.stringify(state) }
+   Deux defauts redhibitoires, mesures a 2 563 aliquots :
+
+   1. Plafond. Le document pesait 871 531 octets, soit 83 % de la limite dure
+      de 1 MiB par document Firestore. Vers 3 100 aliquots l'ecriture echoue
+      definitivement et la synchro s'arrete — sur un simple toast.
+   2. Ecrasement. Le dernier a ecrire gagnait sur l'etat ENTIER : deux
+      personnes rangeant le congelateur en meme temps, et la seconde
+      sauvegarde effacait integralement le travail de la premiere.
+
+   Nouveau modele — une entite, un document :
+     cryomap/{salle}                    meta de la salle (schema, horodatage)
+     cryomap/{salle}/reagents/{id}      un aliquot
+     cryomap/{salle}/inventory/{id}     un consommable
+     cryomap/{salle}/history/{id}       une ligne de journal
+     cryomap/{salle}/meta/freezers      le plan des congelateurs
+     cryomap/{salle}/meta/preferences   les preferences partagees
+     cryomap/{salle}/meta/prep          la prepa D300e partagee
+
+   Consequences : plus aucun plafond de taille ; deplacer un aliquot ecrit
+   340 octets au lieu de 848 Ko ; et deux personnes qui touchent des aliquots
+   DIFFERENTS ne s'ecrasent plus jamais. Le conflit se reduit a la seule
+   entite reellement editee des deux cotes.
+
+   Le contenu est stocke en JSON dans le champ `d`, ce qui evite les
+   restrictions de Firestore sur les valeurs undefined et les noms de champs,
+   et rend la comparaison avec l'ombre locale exacte.
    ============================================================ */
 const FB_CONFIG_KEY = 'cryomap-firebase';
+const FB_SCHEMA = 2;                 // 1 = ancien document unique
+const FB_BATCH_MAX = 400;            // marge sous la limite de 500 operations
+const FB_HISTORY_MAX = 500;
 let _fb = {
   db: null, room: null,
   clientId: 'c' + Math.random().toString(36).slice(2, 9),
-  unsub: null,
+  unsubs: [],
   applyingRemote: false,
-  lastRev: 0,
   status: 'off',
   pushTimer: null,
   initialized: false,
-  readDone: false   // true only after the initial ref.get() has resolved
+  readDone: false,   // true seulement quand la lecture initiale a abouti
+  // Ombre du serveur : cle -> JSON tel qu'ecrit la-bas. La difference entre
+  // l'ombre et l'etat courant dit exactement quels documents ecrire.
+  shadow: null
 };
 
 function fbLoadConfig() { try { return JSON.parse(localStorage.getItem(FB_CONFIG_KEY) || 'null'); } catch (e) { return null; } }
@@ -8194,6 +8393,36 @@ function fbSetStatus(s) {
   el.style.display = (s === 'off') ? 'none' : '';
 }
 
+/* ---- references ---- */
+function fbRoom()  { return _fb.db.collection('cryomap').doc(_fb.room); }
+function fbCol(n)  { return fbRoom().collection(n); }
+function fbMeta(n) { return fbCol('meta').doc(n); }
+
+/* ---- serialisation d'une entite ---- */
+function fbEntityJson(obj) {
+  // l'identifiant vit dans le nom du document, pas dans le contenu
+  const copy = {}; for (const k in obj) if (k !== 'id') copy[k] = obj[k];
+  return JSON.stringify(copy);
+}
+function fbNewShadow() {
+  return { reagents: new Map(), inventory: new Map(), history: new Map(), meta: new Map() };
+}
+
+/* ---- ombre construite depuis l'etat courant ---- */
+function fbLocalSnapshot() {
+  const snap = fbNewShadow();
+  (state.reagents || []).forEach(r => { if (r && r.id) snap.reagents.set(r.id, fbEntityJson(r)); });
+  (state.inventory || []).forEach(i => { if (i && i.id) snap.inventory.set(i.id, fbEntityJson(i)); });
+  (state.history || []).slice(0, FB_HISTORY_MAX).forEach(h => { if (h && h.id) snap.history.set(h.id, fbEntityJson(h)); });
+  snap.meta.set('freezers', JSON.stringify(state.freezers || []));
+  snap.meta.set('preferences', JSON.stringify(state.preferences || {}));
+  if (state.prep) snap.meta.set('prep', JSON.stringify(state.prep));
+  return snap;
+}
+
+/* ============================================================
+   CONNEXION
+   ============================================================ */
 async function fbInit() {
   const cfg = fbLoadConfig();
   if (!cfg || !cfg.config || !cfg.room) { fbSetStatus('off'); return; }
@@ -8228,41 +8457,35 @@ async function fbInit() {
       }
     }
     _fb.room = cfg.room;
-    const ref = _fb.db.collection('cryomap').doc(_fb.room);
-    let snap;
+
+    let head;
     try {
-      snap = await ref.get();
+      head = await fbRoom().get();
     } catch (readErr) {
-      const code = readErr && readErr.code ? readErr.code : '';
-      fbSetStatus('error');
-      if (code === 'permission-denied') {
-        toast('Acces refuse — verifiez les regles Firestore et que l auth anonyme est activee', 'danger', 10000);
-      } else {
-        toast(t('syncInitError') + ' ' + (readErr.message || code), 'danger', 8000);
-      }
+      fbReportAccessError(readErr);
       return;
     }
-    // From here: initial read is done — pushes are now safe
-    _fb.initialized = true;
-    _fb.readDone = true;
-    if (snap.exists && snap.data() && snap.data().state) {
-      // Remote has data → load it, never overwrite with local empty state
-      fbApplyRemote(snap.data());
-    } else {
-      // First device ever → seed Firebase with our local data
+    const meta = head.exists ? (head.data() || {}) : {};
+
+    // Reprise de l'ancien format : un seul document porteur de tout l'etat
+    if (meta.state && (meta.schema || 1) < FB_SCHEMA) {
+      const done = await fbMigrateLegacy(meta);
+      if (!done) return;
+    } else if (!head.exists) {
+      // Salle neuve : ce poste l'amorce avec ses donnees locales
+      try { await fbRoom().set({ schema: FB_SCHEMA, updatedAt: Date.now() }, { merge: true }); }
+      catch (e) { fbReportAccessError(e); return; }
+      _fb.shadow = fbNewShadow();
+      _fb.initialized = true; _fb.readDone = true;
       await fbPushNow();
     }
-    if (_fb.unsub) { try { _fb.unsub(); } catch (_) {} }
-    _fb.unsub = ref.onSnapshot(function(s) {
-      if (!s.exists) return;
-      const d = s.data();
-      if (!d || !d.state) return;
-      if (d._client === _fb.clientId && d._rev === _fb.lastRev) return;
-      fbApplyRemote(d);
-    }, function(err) {
-      console.error('[CryoMap] Firestore snapshot error:', err);
-      fbSetStatus('error');
-    });
+
+    // Lecture initiale complete, puis ecoute temps reel
+    if (!_fb.readDone) {
+      const loaded = await fbLoadAll();
+      if (!loaded) return;
+    }
+    fbListen();
     fbSetStatus('synced');
   } catch (e) {
     console.error('[CryoMap] Firebase init error:', e);
@@ -8271,31 +8494,182 @@ async function fbInit() {
   }
 }
 
-function fbApplyRemote(d) {
-  try {
-    const incoming = typeof d.state === 'string' ? JSON.parse(d.state) : d.state;
-    if (!incoming || !incoming.freezers) {
-      console.warn('[CryoMap] Remote state invalid, ignoring');
-      return;
-    }
-    _fb.applyingRemote = true;
-    state = incoming;
-    migrateState(state);
-    _fb.lastRev = d._rev || 0;
-    _reagentIndex = null;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {}
-    _fb.applyingRemote = false;
-    render();
-    fbSetStatus('synced');
-  } catch (e) {
-    _fb.applyingRemote = false;
-    console.error('[CryoMap] Apply remote failed:', e);
+/* Message actionnable : sans regles Firestore couvrant les sous-collections,
+   la synchro echoue et l'utilisateur doit savoir quoi corriger. */
+function fbReportAccessError(err) {
+  const code = err && err.code ? err.code : '';
+  fbSetStatus('error');
+  if (code === 'permission-denied') {
+    toast(lang === 'en'
+      ? 'Access denied by Firestore rules. They must now cover the sub-collections: match /cryomap/{room}/{document=**}'
+      : 'Accès refusé par les règles Firestore. Elles doivent désormais couvrir les sous-collections : match /cryomap/{room}/{document=**}',
+      'danger', 12000);
+  } else {
+    toast(t('syncInitError') + ' ' + ((err && (err.message || err.code)) || ''), 'danger', 8000);
   }
 }
 
+/* ---- migration depuis le document unique ---- */
+async function fbMigrateLegacy(meta) {
+  try {
+    fbSetStatus('syncing');
+    const incoming = typeof meta.state === 'string' ? JSON.parse(meta.state) : meta.state;
+    if (!incoming || !incoming.freezers) throw new Error('etat distant illisible');
+    migrateState(incoming);
+    // L'etat distant fait foi pendant la migration : c'est celui que l'equipe partage.
+    _fb.applyingRemote = true;
+    state = incoming;
+    ensureHistoryIds();
+    _reagentIndex = null;
+    _fb.applyingRemote = false;
+    _fb.shadow = fbNewShadow();          // rien n'existe encore en sous-collections
+    _fb.initialized = true; _fb.readDone = true;
+    await fbPushNow();                   // ecrit tout, en lots
+    await fbRoom().set({ schema: FB_SCHEMA, updatedAt: Date.now(),
+      state: firebase.firestore.FieldValue.delete() }, { merge: true });
+    schedulePersist();
+    render();
+    toast(lang === 'en'
+      ? 'Team sync upgraded: one document per aliquot (no more size ceiling, no more overwrites)'
+      : 'Synchro d\'équipe migrée : un document par aliquot (plus de plafond, plus d\'écrasement)',
+      'success', 8000);
+    return true;
+  } catch (e) {
+    console.error('[CryoMap] migration sync echouee', e);
+    fbReportAccessError(e);
+    return false;
+  }
+}
+
+/* ---- lecture initiale de toutes les collections ---- */
+async function fbLoadAll() {
+  try {
+    fbSetStatus('syncing');
+    const [rg, iv, hs, mt] = await Promise.all([
+      fbCol('reagents').get(), fbCol('inventory').get(),
+      fbCol('history').get(), fbCol('meta').get()
+    ]);
+    const shadow = fbNewShadow();
+    const reagents = [], inventory = [], history = [];
+    rg.forEach(d => { const v = d.data(); if (!v || typeof v.d !== 'string') return;
+      try { const o = JSON.parse(v.d); o.id = d.id; reagents.push(o); shadow.reagents.set(d.id, v.d); } catch (e) {} });
+    iv.forEach(d => { const v = d.data(); if (!v || typeof v.d !== 'string') return;
+      try { const o = JSON.parse(v.d); o.id = d.id; inventory.push(o); shadow.inventory.set(d.id, v.d); } catch (e) {} });
+    hs.forEach(d => { const v = d.data(); if (!v || typeof v.d !== 'string') return;
+      try { const o = JSON.parse(v.d); o.id = d.id; history.push(o); shadow.history.set(d.id, v.d); } catch (e) {} });
+    const metaDocs = {};
+    mt.forEach(d => { const v = d.data(); if (v && typeof v.d === 'string') { metaDocs[d.id] = v.d; shadow.meta.set(d.id, v.d); } });
+
+    _fb.applyingRemote = true;
+    // Le distant fait foi au demarrage, sauf s'il est vide : on ne remplace
+    // jamais des donnees locales par du neant.
+    if (metaDocs.freezers) { try { state.freezers = JSON.parse(metaDocs.freezers); } catch (e) {} }
+    if (metaDocs.preferences) { try { state.preferences = JSON.parse(metaDocs.preferences); } catch (e) {} }
+    if (metaDocs.prep) { try { state.prep = JSON.parse(metaDocs.prep); } catch (e) {} }
+    if (reagents.length || shadow.meta.has('freezers')) state.reagents = reagents;
+    if (inventory.length) state.inventory = inventory;
+    if (history.length) state.history = history.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    migrateState(state);
+    ensureHistoryIds();
+    _reagentIndex = null;
+    _fb.applyingRemote = false;
+
+    _fb.shadow = shadow;
+    _fb.initialized = true; _fb.readDone = true;
+    schedulePersist();
+    render();
+    // Ce que ce poste avait en plus part maintenant, sans rien ecraser.
+    fbSchedulePush();
+    return true;
+  } catch (e) {
+    _fb.applyingRemote = false;
+    fbReportAccessError(e);
+    return false;
+  }
+}
+
+/* ---- ecoute temps reel ---- */
+function fbListen() {
+  fbStopListening();
+  const onErr = err => { console.error('[CryoMap] snapshot', err); fbReportAccessError(err); };
+  _fb.unsubs.push(fbCol('reagents').onSnapshot(sn => fbApplyChanges('reagents', sn), onErr));
+  _fb.unsubs.push(fbCol('inventory').onSnapshot(sn => fbApplyChanges('inventory', sn), onErr));
+  _fb.unsubs.push(fbCol('history').onSnapshot(sn => fbApplyChanges('history', sn), onErr));
+  _fb.unsubs.push(fbCol('meta').onSnapshot(sn => fbApplyMeta(sn), onErr));
+}
+function fbStopListening() {
+  _fb.unsubs.forEach(u => { try { u(); } catch (e) {} });
+  _fb.unsubs = [];
+}
+
+/* Application incrementale. Le point cle : une modification distante sur
+   l'aliquot A ne touche jamais l'aliquot B. C'est ce qui supprime
+   l'ecrasement mutuel de l'ancien modele. */
+function fbApplyChanges(kind, snapshot) {
+  if (!_fb.readDone) return;
+  const listKey = kind === 'reagents' ? 'reagents' : kind === 'inventory' ? 'inventory' : 'history';
+  const shadow = _fb.shadow[kind];
+  const byId = new Map((state[listKey] || []).map(o => [o.id, o]));
+  let touched = false;
+  snapshot.docChanges().forEach(ch => {
+    const id = ch.doc.id;
+    if (ch.type === 'removed') {
+      shadow.delete(id);
+      if (byId.delete(id)) touched = true;
+      return;
+    }
+    const v = ch.doc.data();
+    if (!v || typeof v.d !== 'string') return;
+    if (shadow.get(id) === v.d) return;          // deja identique : rien a faire
+    try {
+      const o = JSON.parse(v.d); o.id = id;
+      byId.set(id, o); shadow.set(id, v.d); touched = true;
+    } catch (e) {}
+  });
+  if (!touched) return;
+  _fb.applyingRemote = true;
+  let list = Array.from(byId.values());
+  if (listKey === 'history') list = list.sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, FB_HISTORY_MAX);
+  state[listKey] = list;
+  _reagentIndex = null;
+  _fb.applyingRemote = false;
+  schedulePersist();
+  render();
+  fbSetStatus('synced');
+}
+
+function fbApplyMeta(snapshot) {
+  if (!_fb.readDone) return;
+  let touched = false;
+  snapshot.docChanges().forEach(ch => {
+    const id = ch.doc.id;
+    if (ch.type === 'removed') { _fb.shadow.meta.delete(id); return; }
+    const v = ch.doc.data();
+    if (!v || typeof v.d !== 'string') return;
+    if (_fb.shadow.meta.get(id) === v.d) return;
+    _fb.shadow.meta.set(id, v.d);
+    try {
+      const parsed = JSON.parse(v.d);
+      if (id === 'freezers' && Array.isArray(parsed) && parsed.length) { state.freezers = parsed; touched = true; }
+      else if (id === 'preferences' && parsed && typeof parsed === 'object') { state.preferences = parsed; touched = true; }
+      else if (id === 'prep') { state.prep = parsed; touched = true; }
+    } catch (e) {}
+  });
+  if (!touched) return;
+  _fb.applyingRemote = true;
+  migrateState(state);
+  _reagentIndex = null;
+  _fb.applyingRemote = false;
+  schedulePersist();
+  render();
+}
+
+/* ============================================================
+   ECRITURE — seulement ce qui a change
+   ============================================================ */
 function fbSchedulePush() {
   if (!_fb.initialized || !_fb.db || !_fb.room) return;
-  if (!_fb.readDone) return;      // ← never push before initial read completes
+  if (!_fb.readDone) return;
   if (_fb.applyingRemote) return;
   fbSetStatus('syncing');
   clearTimeout(_fb.pushTimer);
@@ -8303,20 +8677,41 @@ function fbSchedulePush() {
 }
 
 async function fbPushNow() {
-  if (!_fb.db || !_fb.room) return;
-  try {
-    _fb.lastRev = Date.now();
-    await _fb.db.collection('cryomap').doc(_fb.room).set({
-      state: JSON.stringify(state),
-      _rev: _fb.lastRev,
-      _client: _fb.clientId,
-      _updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null
+  if (!_fb.db || !_fb.room || !_fb.shadow) return;
+  const local = fbLocalSnapshot();
+  const ops = [];
+  const plan = (kind, colName) => {
+    const cur = local[kind], old = _fb.shadow[kind];
+    cur.forEach((json, id) => {
+      if (old.get(id) !== json) ops.push({ kind, id, colName, json });
     });
+    old.forEach((json, id) => {
+      if (!cur.has(id)) ops.push({ kind, id, colName, del: true });
+    });
+  };
+  plan('reagents', 'reagents');
+  plan('inventory', 'inventory');
+  plan('history', 'history');
+  plan('meta', 'meta');
+  if (!ops.length) { fbSetStatus('synced'); return; }
+  try {
+    for (let i = 0; i < ops.length; i += FB_BATCH_MAX) {
+      const chunk = ops.slice(i, i + FB_BATCH_MAX);
+      const batch = _fb.db.batch();
+      chunk.forEach(op => {
+        const ref = op.colName === 'meta' ? fbMeta(op.id) : fbCol(op.colName).doc(op.id);
+        if (op.del) batch.delete(ref);
+        else batch.set(ref, { d: op.json, by: _fb.clientId, at: Date.now() });
+      });
+      await batch.commit();
+      // l'ombre suit lot par lot : une coupure reseau ne fait pas perdre le fil
+      chunk.forEach(op => { if (op.del) _fb.shadow[op.kind].delete(op.id); else _fb.shadow[op.kind].set(op.id, op.json); });
+    }
+    await fbRoom().set({ schema: FB_SCHEMA, updatedAt: Date.now() }, { merge: true });
     fbSetStatus('synced');
   } catch (e) {
     console.error('[CryoMap] Push error:', e);
-    fbSetStatus('error');
-    toast(t('syncError') + ': ' + (e && e.message ? e.message : ''), 'danger');
+    fbReportAccessError(e);
   }
 }
 
@@ -8326,8 +8721,18 @@ async function fbForcePush() {
   const nR = state.reagents ? state.reagents.length : 0;
   const ok = await customConfirm(t('syncForcePush'), t('syncForcePushConfirm', { nR }), t('syncForcePushBtn'));
   if (!ok) return;
-  await fbPushNow();
-  toast(t('syncForcePushDone'), 'success');
+  // On repart d'une ombre vide : tout est reecrit, et ce qui n'existe plus
+  // localement est supprime la-bas.
+  try {
+    const [rg, iv, hs] = await Promise.all([fbCol('reagents').get(), fbCol('inventory').get(), fbCol('history').get()]);
+    const shadow = fbNewShadow();
+    rg.forEach(d => shadow.reagents.set(d.id, '\u0000'));
+    iv.forEach(d => shadow.inventory.set(d.id, '\u0000'));
+    hs.forEach(d => shadow.history.set(d.id, '\u0000'));
+    _fb.shadow = shadow;
+    await fbPushNow();
+    toast(t('syncForcePushDone'), 'success');
+  } catch (e) { fbReportAccessError(e); }
 }
 
 // RECOVERY: replace THIS machine's data with the cloud's
@@ -8335,17 +8740,9 @@ async function fbForcePull() {
   if (!_fb.db || !_fb.room) { toast(t('syncNotConnected'), 'warn'); return; }
   const ok = await customConfirm(t('syncForcePull'), t('syncForcePullConfirm'), t('syncForcePullBtn'));
   if (!ok) return;
-  try {
-    const snap = await _fb.db.collection('cryomap').doc(_fb.room).get();
-    if (snap.exists && snap.data() && snap.data().state) {
-      fbApplyRemote(snap.data());
-      toast(t('syncForcePullDone'), 'success');
-    } else {
-      toast(t('syncCloudEmpty'), 'warn');
-    }
-  } catch (e) {
-    toast(t('syncError') + ': ' + (e && e.message ? e.message : ''), 'danger');
-  }
+  _fb.readDone = false;
+  const loaded = await fbLoadAll();
+  if (loaded) { fbListen(); toast(t('syncForcePullDone'), 'success'); }
 }
 
 async function fbConnect(configText, room, useAnon) {
@@ -8354,8 +8751,8 @@ async function fbConnect(configText, room, useAnon) {
   catch (e) { toast(t('syncBadConfig'), 'danger'); return false; }
   if (!config || !config.projectId) { toast(t('syncBadConfig'), 'danger'); return false; }
   if (!room || !room.trim()) { toast(t('syncNeedRoom'), 'danger'); return false; }
-  if (_fb.unsub) { try { _fb.unsub(); } catch (_) {} _fb.unsub = null; }
-  _fb.db = null; _fb.room = null; _fb.initialized = false;
+  fbStopListening();
+  _fb.db = null; _fb.room = null; _fb.initialized = false; _fb.readDone = false; _fb.shadow = null;
   fbSaveConfig({ config, room: room.trim(), anon: useAnon !== false });
   await fbInit();
   return _fb.status === 'synced';
@@ -8363,8 +8760,8 @@ async function fbConnect(configText, room, useAnon) {
 
 function fbDisconnect() {
   clearTimeout(_fb.pushTimer);
-  if (_fb.unsub) { try { _fb.unsub(); } catch (_) {} }
-  _fb.unsub = null; _fb.db = null; _fb.room = null; _fb.initialized = false; _fb.readDone = false;
+  fbStopListening();
+  _fb.db = null; _fb.room = null; _fb.initialized = false; _fb.readDone = false; _fb.shadow = null;
   fbClearConfig();
   fbSetStatus('off');
   toast(t('syncDisconnected'), 'success');
@@ -8433,76 +8830,110 @@ const UNDO_MAX = 25;
    SAUVEGARDES AUTOMATIQUES (filet avant opération destructive)
    ============================================================ */
 const AUTOBK_KEY = 'cryomap_autobackups';
-const AUTOBK_MAX = 3;   // 3 x ~700 Ko : marge sûre sous la limite localStorage (~5 Mo)
-function autoBackup(label) {
+/* Les sauvegardes vivent dans IndexedDB : plus de plafond, donc 10 points de
+   retour au lieu de 3 (la limite de 3 n'existait que pour tenir dans le quota
+   de localStorage a cote de l'etat courant). */
+const AUTOBK_MAX = 10;
+let _autoBackups = null;          // cache memoire, charge au demarrage
+let _autoBackupsLoaded = false;
+
+async function loadAutoBackups() {
+  if (_autoBackupsLoaded) return _autoBackups || [];
+  let list = await kvGet(AUTOBK_KEY);
+  if (!Array.isArray(list)) {
+    // Reprise des sauvegardes de l'ancien emplacement (localStorage)
+    try { const l = JSON.parse(localStorage.getItem(AUTOBK_KEY) || '[]'); list = Array.isArray(l) ? l : []; }
+    catch (e) { list = []; }
+    if (list.length) { kvSet(AUTOBK_KEY, list).catch(() => {}); try { localStorage.removeItem(AUTOBK_KEY); } catch (e) {} }
+  }
+  _autoBackups = list; _autoBackupsLoaded = true;
+  return list;
+}
+function listAutoBackups() { return _autoBackups || []; }
+
+/* Recoit la serialisation deja calculee par pushUndo : on ne serialise pas
+   848 Ko une seconde fois pour la meme action. L'ecriture part en tache de
+   fond, elle ne retarde plus le clic. */
+function autoBackupFrom(json, label) {
   try {
-    const snap = {
-      at: new Date().toISOString(),
-      label: label || '',
-      n: (state.reagents || []).length,
-      state: JSON.stringify({ freezers: state.freezers, reagents: state.reagents, inventory: state.inventory || [] })
-    };
-    let list = [];
-    try { list = JSON.parse(localStorage.getItem(AUTOBK_KEY) || '[]'); } catch (e) { list = []; }
-    if (!Array.isArray(list)) list = [];
-    // évite d'empiler des sauvegardes identiques à la seconde près
-    if (list.length && list[0].state === snap.state) return;
-    list.unshift(snap);
-    list = list.slice(0, AUTOBK_MAX);
-    // Si le quota est atteint, on réduit progressivement plutôt que d'échouer
-    while (list.length) {
-      try { localStorage.setItem(AUTOBK_KEY, JSON.stringify(list)); return; }
-      catch (e) { list.pop(); }
-    }
-    try { localStorage.removeItem(AUTOBK_KEY); } catch (e) {}
+    if (!_autoBackupsLoaded) return;                  // pas encore charge : on saute ce point
+    const list = _autoBackups || (_autoBackups = []);
+    if (list.length && list[0].state === json) return;  // rien n'a change
+    list.unshift({ at: new Date().toISOString(), label: label || '', n: (state.reagents || []).length, state: json });
+    if (list.length > AUTOBK_MAX) list.length = AUTOBK_MAX;
+    kvSet(AUTOBK_KEY, list).catch(e => console.warn('[CryoMap] sauvegarde auto non ecrite', e));
   } catch (e) { /* on n'interrompt jamais l'action de l'utilisateur */ }
 }
-function listAutoBackups() {
-  try { const l = JSON.parse(localStorage.getItem(AUTOBK_KEY) || '[]'); return Array.isArray(l) ? l : []; }
-  catch (e) { return []; }
+function autoBackup(label) {
+  try { autoBackupFrom(JSON.stringify({ freezers: state.freezers, reagents: state.reagents, inventory: state.inventory || [] }), label); }
+  catch (e) {}
 }
 async function openRestoreBackup() {
+  await loadAutoBackups();
   const list = listAutoBackups();
   if (!list.length) { toast(lang === 'en' ? 'No automatic backup yet' : 'Aucune sauvegarde automatique', 'warn'); return; }
-  const b = list[0];
-  const when = new Date(b.at).toLocaleString(lang === 'en' ? 'en-GB' : 'fr-FR');
+  const en = lang === 'en';
+  const fmtWhen = b => new Date(b.at).toLocaleString(en ? 'en-GB' : 'fr-FR');
+  // 10 points de retour : on les liste au lieu d'imposer le plus recent
+  const rows = list.map((b, i) => `<label class="cleanup-item" style="cursor:pointer">
+      <input type="radio" name="bkPick" value="${i}" ${i === 0 ? 'checked' : ''}>
+      <div style="flex:1;min-width:0">
+        <div class="cleanup-name">${escapeHtml(fmtWhen(b))}</div>
+        <div class="cleanup-meta">${b.n} ${en ? 'aliquots' : 'aliquots'}${b.label ? ' · ' + escapeHtml(b.label) : ''}</div>
+      </div>
+    </label>`).join('');
   const ok = await customConfirm(
-    lang === 'en' ? 'Restore backup' : 'Restaurer la sauvegarde',
-    (lang === 'en'
-      ? 'Restore the state saved on ' + when + ' (' + b.n + ' items)? Current data will be replaced.'
-      : 'Restaurer l\'état du ' + when + ' (' + b.n + ' items) ? Les données actuelles seront remplacées.'),
-    lang === 'en' ? 'Restore' : 'Restaurer');
+    en ? 'Restore a backup' : 'Restaurer une sauvegarde',
+    `<div style="margin-bottom:10px;font-size:13px">${en
+        ? 'Pick a restore point. Current data will be replaced (undo stays available).'
+        : 'Choisis un point de retour. Les données actuelles seront remplacées (l\'annulation reste possible).'}</div>${rows}`,
+    en ? 'Restore' : 'Restaurer', true);
   if (!ok) return;
+  const picked = document.querySelector('input[name="bkPick"]:checked');
+  const b = list[picked ? Number(picked.value) : 0];
+  if (!b) return;
   try {
     const data = JSON.parse(b.state);
-    pushUndo(lang === 'en' ? 'Restore backup' : 'Restauration sauvegarde');
+    pushUndo(en ? 'Restore backup' : 'Restauration sauvegarde');
     state.freezers = data.freezers || [];
     state.reagents = data.reagents || [];
     state.inventory = data.inventory || [];
     saveState(); render();
-    toast(lang === 'en' ? 'Backup restored' : 'Sauvegarde restaurée', 'success');
+    toast(en ? 'Backup restored' : 'Sauvegarde restaurée', 'success');
   } catch (e) {
-    toast(lang === 'en' ? 'Corrupted backup' : 'Sauvegarde corrompue', 'danger');
+    toast(en ? 'Corrupted backup' : 'Sauvegarde corrompue', 'danger');
   }
 }
 
+/* Un instantane est garde SERIALISE, pas clone.
+   Avant : JSON.parse(JSON.stringify(...)) sur tout l'etat (36 ms mesures a
+   2 563 aliquots), puis autoBackup serialisait la meme chose une seconde fois,
+   et la pile de 25 graphes d'objets pesait ~21 Mo. Une seule serialisation
+   sert maintenant aux deux, le parse n'a lieu qu'au moment d'annuler, et la
+   pile est bornee en octets autant qu'en nombre. */
+const UNDO_MAX_BYTES = 8 * 1024 * 1024;
 function pushUndo(label) {
-  autoBackup(label);
-  const snapshot = {
-    freezers: JSON.parse(JSON.stringify(state.freezers)),
-    reagents: JSON.parse(JSON.stringify(state.reagents)),
-    inventory: JSON.parse(JSON.stringify(state.inventory || []))
-  };
-  undoStack.push({ snapshot, label, ts: Date.now() });
-  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  let json;
+  try { json = JSON.stringify({ freezers: state.freezers, reagents: state.reagents, inventory: state.inventory || [] }); }
+  catch (e) { return; }
+  autoBackupFrom(json, label);
+  undoStack.push({ json, label, ts: Date.now() });
+  let bytes = 0;
+  for (const e of undoStack) bytes += e.json.length;
+  while (undoStack.length > 1 && (undoStack.length > UNDO_MAX || bytes > UNDO_MAX_BYTES)) {
+    bytes -= undoStack.shift().json.length;
+  }
   refreshUndoButton();
 }
 function undo() {
   if (undoStack.length === 0) { toast(t('toastNothingToUndo'), 'warn'); return; }
   const entry = undoStack.pop();
-  state.freezers = entry.snapshot.freezers;
-  state.reagents = entry.snapshot.reagents;
-  if (entry.snapshot.inventory) state.inventory = entry.snapshot.inventory;
+  let snap;
+  try { snap = JSON.parse(entry.json); }
+  catch (e) { toast(t('toastNothingToUndo'), 'warn'); refreshUndoButton(); return; }
+  state.freezers = snap.freezers;
+  state.reagents = snap.reagents;
+  if (snap.inventory) state.inventory = snap.inventory;
   // Retire l'entree d'historique correspondante. logAction empile avec unshift
   // (le plus recent en tete) : c'est donc shift() et non pop(), sinon l'annulation
   // effacait la plus ANCIENNE trace et laissait celle de l'action annulee.
@@ -8628,7 +9059,8 @@ async function restoreLogFile() {
     const h = await _idbGet('handle');
     if (!h) return;
     let perm = await h.queryPermission({ mode: 'readwrite' });
-    if (perm === 'prompt') perm = 'prompt';   // nécessite un geste utilisateur : on retentera au 1er clic
+    // « prompt » exige un geste utilisateur : on garde le handle et la
+    // permission sera demandée à la première écriture.
     if (perm === 'granted') { _logHandle = h; await _flushLog(); }
     else _logHandle = h;   // gardé, permission demandée à la première écriture
   } catch (e) {}
@@ -8693,8 +9125,15 @@ function exportLogCsv() {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
+/* Chaque ligne de journal porte un identifiant : c'est lui qui nomme son
+   document dans la synchro (un document par entree), de sorte que deux postes
+   qui journalisent en meme temps ne s'ecrasent plus. */
+function ensureHistoryIds() {
+  (state.history || []).forEach(h => { if (h && !h.id) h.id = 'h' + (h.ts || Date.now()) + Math.random().toString(36).slice(2, 7); });
+}
 function logAction(key, vars) {
   state.history.unshift({
+    id: 'h' + Date.now() + Math.random().toString(36).slice(2, 7),
     ts: Date.now(),
     key,
     vars: vars || {},
@@ -8753,7 +9192,9 @@ function hasActiveFilter() {
 }
 
 function getFreezer(id) { return state.freezers.find(f => f.id === id); }
-function activeFreezer() { return view.freezerId ? getFreezer(view.freezerId) : state.freezers[0]; }
+// Retombe toujours sur un congelateur existant : un identifiant perime
+// (zone supprimee par un collegue, import, annulation) renvoyait undefined.
+function activeFreezer() { return (view.freezerId ? getFreezer(view.freezerId) : null) || state.freezers[0]; }
 function getZone(fId, zId) { return getFreezer(fId)?.zones.find(z => z.id === zId); }
 // Per-render index: maps "fId|zId" → reagents[] for zone, "fId|zId|br|bc" → reagents[] for box.
 // Rebuilt at start of each render(). Lookups become O(1) after a single O(N) pass.
@@ -9033,12 +9474,22 @@ function locString(loc) {
   }
   return `${f.name} · ${z.name}`;
 }
+function expirySoonDays() {
+  const v = state && state.preferences ? Number(state.preferences.expirySoonDays) : NaN;
+  return (isFinite(v) && v >= 0) ? v : EXPIRY_SOON_DEFAULT;
+}
 function expiryStatus(dateStr) {
   if (!dateStr) return 'none';
   const d = new Date(dateStr);
-  const diff = (d - new Date()) / (1000 * 60 * 60 * 24);
+  if (isNaN(d.getTime())) return 'none';        // date illisible : ni périmé ni valide
+  // Comparaison de DATES, à minuit : sinon le statut d'un aliquot qui périme
+  // aujourd'hui changeait au fil de la journée selon l'heure de consultation.
+  const day = 86400000;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - today) / day);
   if (diff < 0) return 'expired';
-  if (diff < 30) return 'expiring';
+  if (diff <= expirySoonDays()) return 'expiring';
   return 'ok';
 }
 function escapeHtml(s) {
@@ -9085,85 +9536,172 @@ function toast(message, type = 'default', ms = 3000) {
 
 /* CONFIRM */
 // asHtml=true : le corps est du HTML (récapitulatif structuré), sinon du texte simple.
-function customConfirm(title, body, okLabel = 'Confirmer', asHtml = false) {
+/* Piège de focus, pour les 18 fenêtres modales — pas seulement les dialogues.
+   Au clavier, la tabulation sortait de la fenêtre et se promenait dans la page
+   derrière. Un seul écouteur global boucle sur les éléments focusables de la
+   fenêtre visible la plus haute. */
+function focusablesIn(root) {
+  return Array.from(root.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter(el => el.offsetParent !== null);
+}
+function topmostModal() {
+  const open = document.querySelectorAll('.modal-backdrop.show');
+  // confirmModal est toujours au-dessus : c'est lui qui se superpose aux autres
+  const cm = document.getElementById('confirmModal');
+  if (cm && cm.classList.contains('show')) return cm;
+  return open.length ? open[open.length - 1] : null;
+}
+function setupModalFocusTrap() {
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Tab') return;
+    const modal = topmostModal();
+    if (!modal) return;
+    const f = focusablesIn(modal);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    const inside = modal.contains(document.activeElement);
+    if (!inside) { e.preventDefault(); (e.shiftKey ? last : first).focus(); return; }
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }, true);
+}
+
+/* ------------------------------------------------------------------
+   Fenêtres de dialogue — un seul cœur pour confirmer / saisir.
+
+   Garantie tenue par _openDialog : une fenêtre ouverte résout TOUJOURS sa
+   promesse (OK, Annuler, Échap, clic sur le fond) et retire tous ses
+   écouteurs d'un coup, via AbortController.
+
+   Avant, Échap était traité par le raccourci global, qui masquait la fenêtre
+   sans résoudre : la promesse restait en suspens ET son écouteur OK restait
+   attaché au bouton. Une confirmation abandonnée se déclenchait donc au
+   prochain OK cliqué — refuser une suppression puis en confirmer une autre
+   supprimait les deux.
+   ------------------------------------------------------------------ */
+let _dialogOpen = 0;
+function dialogIsOpen() { return _dialogOpen > 0; }
+function _openDialog(opts) {
   return new Promise(resolve => {
-    document.getElementById('confirmTitle').textContent = title;
-    if (asHtml) document.getElementById('confirmBody').innerHTML = body;
-    else document.getElementById('confirmBody').textContent = body;
-    document.getElementById('confirmOk').textContent = okLabel;
-    const modal = document.getElementById('confirmModal');
-    modal.classList.add('show');
-    const onOk = () => { cleanup(); resolve(true); };
-    const onCancel = () => { cleanup(); resolve(false); };
-    function cleanup() {
+    const modal  = document.getElementById('confirmModal');
+    const okBtn  = document.getElementById('confirmOk');
+    const cclBtn = document.getElementById('confirmCancel');
+    const bodyEl = document.getElementById('confirmBody');
+    document.getElementById('confirmTitle').textContent = opts.title;
+    if (opts.html != null) bodyEl.innerHTML = opts.html;
+    else bodyEl.textContent = opts.text == null ? '' : opts.text;
+    okBtn.textContent = opts.okLabel;
+
+    const ac = new AbortController();
+    const on = { signal: ac.signal };
+    let settled = false;
+    let focusReturn = document.activeElement;   // on rend le focus à l'appelant
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      _dialogOpen--;
+      ac.abort();                          // retire tous les écouteurs de CETTE fenêtre
       modal.classList.remove('show');
-      document.getElementById('confirmOk').removeEventListener('click', onOk);
-      document.getElementById('confirmCancel').removeEventListener('click', onCancel);
+      if (opts.clearBody) bodyEl.innerHTML = '';
+      if (focusReturn) { try { focusReturn.focus(); } catch (e) {} focusReturn = null; }
+      resolve(value);
+    };
+
+    _dialogOpen++;
+    modal.classList.add('show');
+    okBtn.addEventListener('click', () => finish(opts.read ? opts.read() : true), on);
+    cclBtn.addEventListener('click', () => finish(opts.cancelValue), on);
+    // Le fond et Échap appartiennent à la fenêtre, plus au raccourci global :
+    // en capture + stopImmediatePropagation, la fenêtre tranche elle-même.
+    modal.addEventListener('mousedown', e => { if (e.target === modal) finish(opts.cancelValue); }, on);
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      finish(opts.cancelValue);
+    }, { signal: ac.signal, capture: true });
+    if (opts.afterOpen) opts.afterOpen(bodyEl, finish, on);
+  });
+}
+
+// asHtml=true : le corps est du HTML (récapitulatif structuré), sinon du texte simple.
+function customConfirm(title, body, okLabel = 'Confirmer', asHtml = false) {
+  return _openDialog({
+    title, okLabel, cancelValue: false,
+    html: asHtml ? body : null,
+    text: asHtml ? null : body
+  });
+}
+
+function _promptDialog(title, body, defaultValue, okLabel, inputHtml) {
+  return _openDialog({
+    title, okLabel, cancelValue: null, clearBody: true,
+    html: `<div style="margin-bottom:12px">${escapeHtml(body)}</div>${inputHtml}`,
+    read: () => { const i = document.getElementById('customPromptInput'); return i ? i.value : null; },
+    afterOpen: (bodyEl, finish, on) => {
+      const input = bodyEl.querySelector('#customPromptInput');
+      if (!input) return;
+      setTimeout(() => { try { input.focus(); input.select(); } catch (e) {} }, 50);
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); finish(input.value); }
+      }, on);
     }
-    document.getElementById('confirmOk').addEventListener('click', onOk);
-    document.getElementById('confirmCancel').addEventListener('click', onCancel);
   });
 }
 
 function customPrompt(title, body, defaultValue = '', okLabel = 'OK') {
-  return new Promise(resolve => {
-    document.getElementById('confirmTitle').textContent = title;
-    const bodyEl = document.getElementById('confirmBody');
-    bodyEl.innerHTML = `<div style="margin-bottom:12px">${escapeHtml(body)}</div>
-      <input type="number" min="1" step="1" id="customPromptInput" class="form-input" value="${escapeHtml(defaultValue)}" autocomplete="off">`;
-    document.getElementById('confirmOk').textContent = okLabel;
-    const modal = document.getElementById('confirmModal');
-    modal.classList.add('show');
-    const input = document.getElementById('customPromptInput');
-    setTimeout(() => { input.focus(); input.select(); }, 50);
-    const onOk = () => { const v = input.value; cleanup(); resolve(v); };
-    const onCancel = () => { cleanup(); resolve(null); };
-    const onKey = e => { if (e.key === 'Enter') { e.preventDefault(); onOk(); } };
-    function cleanup() {
-      modal.classList.remove('show');
-      bodyEl.innerHTML = '';
-      document.getElementById('confirmOk').removeEventListener('click', onOk);
-      document.getElementById('confirmCancel').removeEventListener('click', onCancel);
-      input.removeEventListener('keydown', onKey);
-    }
-    document.getElementById('confirmOk').addEventListener('click', onOk);
-    document.getElementById('confirmCancel').addEventListener('click', onCancel);
-    input.addEventListener('keydown', onKey);
-  });
+  return _promptDialog(title, body, defaultValue, okLabel,
+    `<input type="number" min="1" step="1" id="customPromptInput" class="form-input" value="${escapeHtml(defaultValue)}" autocomplete="off">`);
 }
 
 function customTextPrompt(title, body, defaultValue = '', okLabel = 'OK', placeholder = '') {
-  return new Promise(resolve => {
-    document.getElementById('confirmTitle').textContent = title;
-    const bodyEl = document.getElementById('confirmBody');
-    bodyEl.innerHTML = `<div style="margin-bottom:12px">${escapeHtml(body)}</div>
-      <input type="text" id="customPromptInput" class="form-input" value="${escapeHtml(defaultValue)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off">`;
-    document.getElementById('confirmOk').textContent = okLabel;
-    const modal = document.getElementById('confirmModal');
-    modal.classList.add('show');
-    const input = document.getElementById('customPromptInput');
-    setTimeout(() => { input.focus(); input.select(); }, 50);
-    const onOk = () => { const v = input.value; cleanup(); resolve(v); };
-    const onCancel = () => { cleanup(); resolve(null); };
-    const onKey = e => { if (e.key === 'Enter') { e.preventDefault(); onOk(); } };
-    function cleanup() {
-      modal.classList.remove('show');
-      bodyEl.innerHTML = '';
-      document.getElementById('confirmOk').removeEventListener('click', onOk);
-      document.getElementById('confirmCancel').removeEventListener('click', onCancel);
-      input.removeEventListener('keydown', onKey);
-    }
-    document.getElementById('confirmOk').addEventListener('click', onOk);
-    document.getElementById('confirmCancel').addEventListener('click', onCancel);
-    input.addEventListener('keydown', onKey);
-  });
+  return _promptDialog(title, body, defaultValue, okLabel,
+    `<input type="text" id="customPromptInput" class="form-input" value="${escapeHtml(defaultValue)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off">`);
 }
 
 /* ============================================================
    RENDERING
    ============================================================ */
+/* Recale la vue sur des entites qui existent VRAIMENT.
+   Indispensable des lors que les donnees peuvent changer sous nos pieds :
+   un collegue qui renomme le plan, supprime une zone ou une boite laissait
+   view.freezerId / zoneId / boxRow pointer dans le vide, et activeFreezer()
+   renvoyait undefined — le rendu plantait au milieu de la carte. */
+function reconcileView() {
+  if (!state.freezers || !state.freezers.length) return;
+  if (!view.freezerId || !getFreezer(view.freezerId)) {
+    view.freezerId = state.freezers[0].id;
+    view.zoneId = null; view.boxRow = null; view.boxCol = null; view.compBoxId = null;
+    if (view.level !== 'overview') view.level = 'overview';
+  }
+  if (view.zoneId) {
+    const z = getZone(view.freezerId, view.zoneId);
+    if (!z) {
+      view.zoneId = null; view.boxRow = null; view.boxCol = null; view.compBoxId = null;
+      view.level = 'overview';
+    } else if (view.level === 'box' && (z.type !== 'rack'
+               || view.boxRow == null || view.boxRow >= (z.rackHeight || 0)
+               || view.boxCol == null || view.boxCol >= (z.rackDepth || 0))) {
+      view.level = z.type === 'rack' ? 'rack' : 'compartment';
+      view.boxRow = null; view.boxCol = null;
+    } else if (view.level === 'compbox' && !getCompBox(z, view.compBoxId)) {
+      view.level = 'compartment'; view.compBoxId = null;
+    }
+  } else if (view.level !== 'overview' && view.tab === 'map') {
+    view.level = 'overview';
+  }
+  // Une selection peut viser des aliquots supprimes ailleurs
+  if (view.selectedReagentId && !state.reagents.find(r => r.id === view.selectedReagentId)) view.selectedReagentId = null;
+  if (view.selectedIds && view.selectedIds.size) {
+    const alive = new Set(state.reagents.map(r => r.id));
+    [...view.selectedIds].forEach(id => { if (!alive.has(id)) view.selectedIds.delete(id); });
+    if (!view.selectedIds.size) view.selectMode = false;
+  }
+}
+
 function render() {
 
+  reconcileView();
   rebuildReagentIndex();
   hideRackTooltip();
   renderSidebar();
@@ -9446,7 +9984,6 @@ function invAdjust(id, delta) {
   it.qty = next;
   saveState();
   renderInventory(document.getElementById('canvas'));
-  refreshSidebarOnly();
 }
 async function invSetQty(id) {
   const it = state.inventory.find(x => x.id === id);
@@ -9456,7 +9993,6 @@ async function invSetQty(id) {
   it.qty = Math.max(0, parseInt(val) || 0);
   saveState();
   renderInventory(document.getElementById('canvas'));
-  refreshSidebarOnly();
 }
 let _editingInvId = null;
 function openInvModal(id) {
@@ -9526,7 +10062,6 @@ async function deleteInvItem() {
   render();
 }
 // Light sidebar refresh without recomputing the whole canvas (used by ±1 spam)
-function refreshSidebarOnly() { /* inventory has no sidebar widgets yet; placeholder for future */ }
 
 function renderBreadcrumbs(parts) {
   return `<div class="breadcrumbs">${parts.map((p, i) =>
@@ -10870,6 +11405,11 @@ function askCellContent(posLabel){
     document.getElementById('cellChoiceBox').onclick =function(){ pick('box'); };
     m.querySelectorAll('[data-close-modal="cellChoiceModal"]').forEach(function(b){ b.onclick=function(){ pick(null); }; });
     m.onclick=function(e){ if(e.target===m) pick(null); };
+    // Echap doit resoudre : sinon le raccourci global masquait la fenetre et
+    // la promesse restait en suspens (le .then n'etait jamais atteint).
+    var onEsc=function(e){ if(e.key==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); document.removeEventListener('keydown',onEsc,true); pick(null); } };
+    document.addEventListener('keydown', onEsc, true);
+    var _p=pick; pick=function(v){ document.removeEventListener('keydown',onEsc,true); _p(v); };
     m.classList.add('show');
   });
 }
@@ -13182,6 +13722,7 @@ function navigateFromSearch(el) {
 
 /* IMPORT / EXPORT */
 function exportData() {
+  flushPersist();                       // l'export doit refléter l'état enregistré
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -13371,6 +13912,16 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnMultitabReload').onclick = () => location.reload();
 
   setupMultiTabListener();
+  setupModalFocusTrap();
+
+  // L'ecriture est differee de 250 ms : on la vide avant que la page disparaisse.
+  // pagehide couvre la fermeture, la navigation et le retour arriere ; le
+  // passage a l'etat cache couvre le basculement d'onglet sur mobile.
+  window.addEventListener('pagehide', flushPersist);
+  window.addEventListener('beforeunload', flushPersist);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPersist(); });
+
+  loadAutoBackups().then(() => adoptNewerPersistedState()).catch(() => {});
 
   document.querySelectorAll('[data-close-modal]').forEach(el => el.onclick = () => document.getElementById(el.dataset.closeModal).classList.remove('show'));
   document.querySelectorAll('.modal-backdrop').forEach(el => {
@@ -14058,16 +14609,7 @@ function deleteLiveZone(freezerId, zoneId){
     for(var i=0;i<NIV*PROF;i++){ h+= i===on ? '<div class="p-rcell on" style="background:'+color+';color:'+color+'"></div>' : '<div class="p-rcell"></div>'; }
     return h+'</div>'; }
 
-  function statHTML(valid){
-    var vv=valid.filter(function(r){return r.hasData;});
-    if(vv.length===0) return "";
-    var tubes=0; vv.forEach(function(r){ if(r.tubes!=null && !prep.excluded[(r.name||"").trim().toLowerCase()])tubes+=r.tubes; });
-    var plates=Math.max(1,Number(prep.plates)||1); var ps=L("statPlates")+(plates>1?"s":"");
-    return '<div class="p-stats"><div class="p-stat hero"><b>'+tubes+'</b><span>'+(tubes>1?L("statTubes"):(lang==="en"?"tube to pull":"tube à sortir"))+'</span></div>'
-      +'<div class="p-stat"><b>'+vv.length+'</b><span>'+(vv.length>1?L("statDrugs"):(lang==="en"?"drug":"drogue"))+'</span></div>'
-      +'<div class="p-stat"><b>'+plates+'</b><span>'+ps+'</span></div>'
-      +'</div>';   // volumes mere/diluant : deja detailles par produit juste en dessous
-  }
+  // statHTML() retire : son unique appelant ecrivait dans #p-statband, masque.
   function validateHTML(valid){
     var vv=valid.filter(function(r){return r.hasData&&r.inv;});
     if(vv.length===0) return "";
@@ -14376,7 +14918,9 @@ function deleteLiveZone(freezerId, zoneId){
   function renderResults(){
     if(_rrTimer){ clearTimeout(_rrTimer); _rrTimer=null; }
     var results=groupResults(); var valid=results.filter(function(r){return !r.empty;});
-    var sb=document.getElementById("p-statband"); if(sb) sb.innerHTML=statHTML(valid);
+    // Les indicateurs (tubes / drogues / exemplaires) vivent desormais dans
+    // l'en-tete de la liste a sortir (p-pullhead) : #p-statband porte "hidden"
+    // et son contenu n'etait jamais visible. On ne calcule plus statHTML().
     var nb=document.getElementById("p-normtop")||document.getElementById("p-norm"); if(nb) nb.innerHTML=normHTML(valid);
     var vb=document.getElementById("p-validate"); if(vb){ vb.innerHTML=validateHTML(valid); var b=document.getElementById("p-btnValidate"); if(b) b.onclick=validateRun;
       var ae=document.getElementById("p-btnAllowExp");
@@ -14627,7 +15171,7 @@ function deleteLiveZone(freezerId, zoneId){
     h+='<div class="p-adv"><div class="p-ctl"><label>'+L("margin")+'</label><input class="p-in xs" id="p-exc" type="number" min="0" step="5" value="'+nv(prep.excess)+'"></div><div class="p-ctl" title="'+(lang==="en"?"Max volume prepared in one dilution tube. A dilution too steep for a single step is split into several gentler steps (more tubes, but more reliable pipetting).":"Volume max préparé dans un seul tube de dilution. Une dilution trop forte pour un seul palier est fractionnée en plusieurs paliers plus doux (plus de tubes, mais prélèvements plus fiables).")+'"><label>'+L("minPrep")+'</label><input class="p-in xs" id="p-mp" type="number" min="0" step="5" value="'+nv(prep.maxPrep)+'"></div><div class="p-ctl"><label>'+L("minPip")+'</label><input class="p-in xs" id="p-mpip" type="number" min="0" step="0.5" value="'+nv(prep.minPip)+'"></div><div class="p-ctl" title="'+(lang==="en"?"Default volume to prepare for a dilution when none is given. Ignored on .tdd import — each fluid already carries its computed volume.":"Volume par défaut à préparer pour une dilution quand aucun volume n’est indiqué. Ignoré à l’import .tdd — chaque fluide y a déjà son volume calculé.")+'"><label>'+(lang==="en"?"µL / dilution":"µL / dilution")+'</label><input class="p-in xs" id="p-load" type="number" min="0" step="5" value="'+nv(prep.load)+'"></div></div>';
     h+='</div></div>';
 
-    h+='<div id="p-statband" hidden></div><div id="p-normtop"></div><div id="p-grab"></div><div id="p-norm" hidden></div><div id="p-validate"></div><div id="p-recipes"></div></div>';
+    h+='<div id="p-normtop"></div><div id="p-grab"></div><div id="p-norm" hidden></div><div id="p-validate"></div><div id="p-recipes"></div></div>';
     c.innerHTML=h;
 
     function setPlates(v){ prep.plates=Math.max(1,Math.round(Number(v)||1)); var el=document.getElementById("p-pval"); if(el) el.value=prep.plates; savePrep(); renderResults(); }

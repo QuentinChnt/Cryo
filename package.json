@@ -8,7 +8,8 @@
     "seed": "node tools/build-seed.js",
     "record": "xvfb-run -a --server-args=\"-screen 0 1400x900x24\" node record-demo.js",
     "convert": "./tools/convert.sh",
-    "all": "npm run page && npm run seed && npm run record && npm run convert"
+    "all": "npm run page && npm run seed && npm run record && npm run convert",
+    "test": "node tests/regression.js"
   },
   "dependencies": {
     "https-proxy-agent": "^7.0.6",
