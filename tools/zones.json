@@ -1,0 +1,425 @@
+[
+  {
+    "kind": "zone-rack",
+    "col": 1,
+    "cspan": 1,
+    "row": 1,
+    "rspan": 1,
+    "id": "x75t44fxmpnx6m2j",
+    "name": "Rack Up 1",
+    "badge": "895",
+    "cubes": [
+      {
+        "boxRow": 0,
+        "boxCol": 0,
+        "title": "Niveau 6 · Profondeur 1 — 0/81"
+      },
+      {
+        "boxRow": 0,
+        "boxCol": 1,
+        "title": "Niveau 6 · Profondeur 2 — 0/81"
+      },
+      {
+        "boxRow": 0,
+        "boxCol": 2,
+        "title": "Niveau 6 · Profondeur 3 — 13/144 (12×12)"
+      },
+      {
+        "boxRow": 0,
+        "boxCol": 3,
+        "title": "Niveau 6 · Profondeur 4 — 94/144 (12×12)"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 0,
+        "title": "Niveau 5 · Profondeur 1 — 91/144 (12×12)"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 1,
+        "title": "Niveau 5 · Profondeur 2 — 92/144 (12×12)"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 2,
+        "title": "Niveau 5 · Profondeur 3 — 48/144 (12×12)"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 3,
+        "title": "Niveau 5 · Profondeur 4 — 86/144 (12×12)"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 0,
+        "title": "Niveau 4 · Profondeur 1 — 41/144 (12×12)"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 1,
+        "title": "Niveau 4 · Profondeur 2 — 24/144 (12×12)"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 2,
+        "title": "Niveau 4 · Profondeur 3 — 49/144 (12×12)"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 3,
+        "title": "Niveau 4 · Profondeur 4 — 56/144 (12×12)"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 0,
+        "title": "Niveau 3 · Profondeur 1 — 7/144 (12×12)"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 1,
+        "title": "Niveau 3 · Profondeur 2 — 1/144 (12×12)"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 2,
+        "title": "Niveau 3 · Profondeur 3 — 0/144 (12×12)"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 3,
+        "title": "Niveau 3 · Profondeur 4 — 0/144 (12×12)"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 0,
+        "title": "Niveau 2 · Profondeur 1 — 0/144 (12×12)"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 1,
+        "title": "Niveau 2 · Profondeur 2 — 87/144 (12×12)"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 2,
+        "title": "Niveau 2 · Profondeur 3 — 87/144 (12×12)"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 3,
+        "title": "Niveau 2 · Profondeur 4 — 85/144 (12×12)"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 0,
+        "title": "Niveau 1 · Profondeur 1 — 20/81"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 1,
+        "title": "Niveau 1 · Profondeur 2 — 4/144 (12×12)"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 2,
+        "title": "Niveau 1 · Profondeur 3 — 5/144 (12×12)"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 3,
+        "title": "Niveau 1 · Profondeur 4 — 5/144 (12×12)"
+      }
+    ],
+    "bodyLen": 11195
+  },
+  {
+    "kind": "zone-rack",
+    "col": 2,
+    "cspan": 1,
+    "row": 1,
+    "rspan": 1,
+    "id": "x4j8iuzompp8ru1s",
+    "name": "Rack Up 2",
+    "badge": "1617",
+    "cubes": [
+      {
+        "boxRow": 0,
+        "boxCol": 0,
+        "title": "Niveau 6 · Profondeur 1 — 87/144 (12×12)"
+      },
+      {
+        "boxRow": 0,
+        "boxCol": 1,
+        "title": "Niveau 6 · Profondeur 2 — 30/144 (12×12)"
+      },
+      {
+        "boxRow": 0,
+        "boxCol": 2,
+        "title": "Niveau 6 · Profondeur 3 — 72/144 (12×12)"
+      },
+      {
+        "boxRow": 0,
+        "boxCol": 3,
+        "title": "Niveau 6 · Profondeur 4 — 101/144 (12×12)"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 0,
+        "title": "Niveau 5 · Profondeur 1 — 24/144 (12×12)"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 1,
+        "title": "Niveau 5 · Profondeur 2 — 92/144 (12×12)"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 2,
+        "title": "Niveau 5 · Profondeur 3 — 93/144 (12×12)"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 3,
+        "title": "Niveau 5 · Profondeur 4 — 0/144 (12×12)"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 0,
+        "title": "Niveau 4 · Profondeur 1 — 144/144 (12×12)"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 1,
+        "title": "Niveau 4 · Profondeur 2 — 0/144 (12×12)"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 2,
+        "title": "Niveau 4 · Profondeur 3 — 0/144 (12×12)"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 3,
+        "title": "Niveau 4 · Profondeur 4 — 0/144 (12×12)"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 0,
+        "title": "Niveau 3 · Profondeur 1 — 21/144 (12×12)"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 1,
+        "title": "Niveau 3 · Profondeur 2 — 125/144 (12×12)"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 2,
+        "title": "Niveau 3 · Profondeur 3 — 35/144 (12×12)"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 3,
+        "title": "Niveau 3 · Profondeur 4 — 82/144 (12×12)"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 0,
+        "title": "Niveau 2 · Profondeur 1 — 0/144 (12×12)"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 1,
+        "title": "Niveau 2 · Profondeur 2 — 127/144 (12×12)"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 2,
+        "title": "Niveau 2 · Profondeur 3 — 117/144 (12×12)"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 3,
+        "title": "Niveau 2 · Profondeur 4 — 111/144 (12×12)"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 0,
+        "title": "Niveau 1 · Profondeur 1 — 90/144 (12×12)"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 1,
+        "title": "Niveau 1 · Profondeur 2 — 90/144 (12×12)"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 2,
+        "title": "Niveau 1 · Profondeur 3 — 100/144 (12×12)"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 3,
+        "title": "Niveau 1 · Profondeur 4 — 76/144 (12×12)"
+      }
+    ],
+    "bodyLen": 11247
+  },
+  {
+    "kind": "zone-comp",
+    "col": 3,
+    "cspan": 1,
+    "row": 1,
+    "rspan": 1,
+    "id": "x5486a12mpnx6m2j",
+    "name": "Compartment Up",
+    "badge": "27",
+    "cubes": [],
+    "bodyLen": 10634
+  },
+  {
+    "kind": "zone-comp",
+    "col": 1,
+    "cspan": 2,
+    "row": 3,
+    "rspan": 1,
+    "id": "xzoy3vhxmpnx6m2j",
+    "name": "Compartment Down",
+    "badge": "0",
+    "cubes": [],
+    "bodyLen": 2569
+  },
+  {
+    "kind": "zone-rack",
+    "col": 3,
+    "cspan": 1,
+    "row": 3,
+    "rspan": 1,
+    "id": "xf486gebmpnx6m2j",
+    "name": "Rack down",
+    "badge": "0",
+    "cubes": [
+      {
+        "boxRow": 0,
+        "boxCol": 0,
+        "title": "Niveau 6 · Profondeur 1 — 0/81"
+      },
+      {
+        "boxRow": 0,
+        "boxCol": 1,
+        "title": "Niveau 6 · Profondeur 2 — 0/81"
+      },
+      {
+        "boxRow": 0,
+        "boxCol": 2,
+        "title": "Niveau 6 · Profondeur 3 — 0/81"
+      },
+      {
+        "boxRow": 0,
+        "boxCol": 3,
+        "title": "Niveau 6 · Profondeur 4 — 0/81"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 0,
+        "title": "Niveau 5 · Profondeur 1 — 0/81"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 1,
+        "title": "Niveau 5 · Profondeur 2 — 0/81"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 2,
+        "title": "Niveau 5 · Profondeur 3 — 0/81"
+      },
+      {
+        "boxRow": 1,
+        "boxCol": 3,
+        "title": "Niveau 5 · Profondeur 4 — 0/81"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 0,
+        "title": "Niveau 4 · Profondeur 1 — 0/81"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 1,
+        "title": "Niveau 4 · Profondeur 2 — 0/81"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 2,
+        "title": "Niveau 4 · Profondeur 3 — 0/81"
+      },
+      {
+        "boxRow": 2,
+        "boxCol": 3,
+        "title": "Niveau 4 · Profondeur 4 — 0/81"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 0,
+        "title": "Niveau 3 · Profondeur 1 — 0/81"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 1,
+        "title": "Niveau 3 · Profondeur 2 — 0/81"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 2,
+        "title": "Niveau 3 · Profondeur 3 — 0/81"
+      },
+      {
+        "boxRow": 3,
+        "boxCol": 3,
+        "title": "Niveau 3 · Profondeur 4 — 0/81"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 0,
+        "title": "Niveau 2 · Profondeur 1 — 0/81"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 1,
+        "title": "Niveau 2 · Profondeur 2 — 0/81"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 2,
+        "title": "Niveau 2 · Profondeur 3 — 0/81"
+      },
+      {
+        "boxRow": 4,
+        "boxCol": 3,
+        "title": "Niveau 2 · Profondeur 4 — 0/81"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 0,
+        "title": "Niveau 1 · Profondeur 1 — 0/81"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 1,
+        "title": "Niveau 1 · Profondeur 2 — 0/81"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 2,
+        "title": "Niveau 1 · Profondeur 3 — 0/81"
+      },
+      {
+        "boxRow": 5,
+        "boxCol": 3,
+        "title": "Niveau 1 · Profondeur 4 — 0/81"
+      }
+    ],
+    "bodyLen": 11611
+  }
+]

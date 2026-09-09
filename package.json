@@ -1,0 +1,17 @@
+{
+  "name": "cryomap-demo-video",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright capture of a 30 s CryoMap demo video",
+  "scripts": {
+    "page": "node tools/build-page.js",
+    "seed": "node tools/build-seed.js",
+    "record": "xvfb-run -a --server-args=\"-screen 0 1400x900x24\" node record-demo.js",
+    "convert": "./tools/convert.sh",
+    "all": "npm run page && npm run seed && npm run record && npm run convert"
+  },
+  "dependencies": {
+    "https-proxy-agent": "^7.0.6",
+    "playwright": "^1.63.0"
+  }
+}
