@@ -2236,8 +2236,12 @@ header.topbar { background: var(--paper); border-bottom: 1px solid var(--rule-2)
 .stat-list, .rack-card, .empty-card, .p3-step, .p-recipe {
   background: var(--paper); border: 1px solid var(--rule-2);
   border-radius: var(--r-md); box-shadow: none; }
-.info-card:hover, .item-card:hover, .inv-row:hover, .cg-card:hover,
-.cg-card { min-height: 118px; }
+/* Règle retirée : sa liste de sélecteurs avait perdu son bloc de déclarations
+   et s'était soudée à « .cg-card { min-height: 118px } ». Résultat, survoler
+   une ligne d'inventaire lui imposait 118 px de haut — elle passait de 70 à
+   118 px, d'où l'impression d'agrandissement (même effet sur .info-card,
+   .item-card et .cg-card). Le min-height réel de .cg-card est défini plus bas
+   (112 px), qui l'emportait déjà au repos : rien à conserver ici. */
 
 /* ---------- Pastilles & états : sobres, sans halo ---------- */
 .pill { background: var(--paper-2); border: 1px solid var(--rule-2); color: var(--ink-2);
