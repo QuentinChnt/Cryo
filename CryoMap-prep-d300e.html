@@ -8968,7 +8968,9 @@ function pushUndo(label) {
   try { json = JSON.stringify({ freezers: state.freezers, reagents: state.reagents, inventory: state.inventory || [] }); }
   catch (e) { return; }
   autoBackupFrom(json, label);
-  undoStack.push({ json, label, ts: Date.now() });
+  let prepSnap = null;
+  try { prepSnap = window.__prepSnapshot ? window.__prepSnapshot() : null; } catch (e) {}
+  undoStack.push({ json, label, ts: Date.now(), prep: prepSnap });
   let bytes = 0;
   for (const e of undoStack) bytes += e.json.length;
   while (undoStack.length > 1 && (undoStack.length > UNDO_MAX || bytes > UNDO_MAX_BYTES)) {
@@ -8985,6 +8987,9 @@ function undo() {
   state.freezers = snap.freezers;
   state.reagents = snap.reagents;
   if (snap.inventory) state.inventory = snap.inventory;
+  // La prepa D300e revient avec l'inventaire : annuler un run rend aussi son
+  // protocole, ses cases cochees et ses choix d'emplacement.
+  try { if (entry.prep && window.__prepRestore) window.__prepRestore(entry.prep); } catch (e) {}
   // Retire l'entree d'historique correspondante. logAction empile avec unshift
   // (le plus recent en tete) : c'est donc shift() et non pop(), sinon l'annulation
   // effacait la plus ANCIENNE trace et laissait celle de l'action annulee.
@@ -14582,6 +14587,12 @@ function deleteLiveZone(freezerId, zoneId){
     return map;
   }
 
+  // Message du dernier import .tdd. renderPrepTab reconstruit l'onglet, donc
+  // #p-parsenote : sans memoire, la confirmation (et surtout la liste des
+  // fluides IGNORES) disparaissait aussitot affichee.
+  var PREP_NOTE=null;
+  function showPrepNote(){ var el=document.getElementById("p-parsenote"); if(!el||!PREP_NOTE) return;
+    el.className=PREP_NOTE.cls; el.textContent=PREP_NOTE.txt; }
   var PREP_SPOT={};   // nom normalise -> CLE de l'emplacement choisi (zone|niveau|prof)
   var PREP_LINK={};   // nom du .tdd -> cle produit de l'inventaire (association manuelle)
   // Amorcage depuis le stockage : ces deux tables sont declarees APRES
@@ -15153,6 +15164,7 @@ function deleteLiveZone(freezerId, zoneId){
   // choix d'emplacement restaient en place et contaminaient le run suivant
   // (comptes de tubes forces, cases deja cochees).
   function resetPrepRun(){
+    PREP_NOTE=null;
     prep.fluids=[]; prep.norm=null; prep.excluded={}; prep.sources=[];
     prep.checks={}; prep.tubesOv={}; prep.allowExpired=false;
     for(var k in PREP_SPOT) delete PREP_SPOT[k];
@@ -15370,7 +15382,7 @@ function deleteLiveZone(freezerId, zoneId){
         refillFluids(); renderPrepTab(document.getElementById("canvas"));
       });
       if(ta&&tf) ta.onclick=function(){ tf.setAttribute("data-mode","add"); tf.click(); };
-      if(tb&&tf){ tb.onclick=function(){ tf.setAttribute("data-mode","replace"); tf.click(); }; tf.onchange=function(e){ var file=e.target.files&&e.target.files[0]; if(!file) return; var rd=new FileReader(); rd.onload=function(ev){ var parsed=parseTdd(String(ev.target.result||"")); var note=document.getElementById("p-parsenote"); if(!parsed||!parsed.length){ if(note){note.className="p-note err"; note.textContent=(lang==="en"?"Unreadable .tdd file":"Fichier .tdd illisible");} return; } var addMode = (tf.getAttribute("data-mode")==="add") && prep.fluids.length>0;
+      if(tb&&tf){ tb.onclick=function(){ tf.setAttribute("data-mode","replace"); tf.click(); }; tf.onchange=function(e){ var file=e.target.files&&e.target.files[0]; if(!file) return; var rd=new FileReader(); rd.onload=function(ev){ var parsed=parseTdd(String(ev.target.result||"")); var note=document.getElementById("p-parsenote"); if(!parsed||!parsed.length){ PREP_NOTE={cls:"p-note err",txt:(lang==="en"?"Unreadable .tdd file":"Fichier .tdd illisible")}; showPrepNote(); return; } var addMode = (tf.getAttribute("data-mode")==="add") && prep.fluids.length>0;
         var srcName = file.name || (lang==="en"?"protocol":"protocole");
         var srcId="s"+Date.now()+Math.floor(Math.random()*1000);
         parsed.forEach(function(f){ f.src=srcName; f.srcId=srcId; });
@@ -15390,18 +15402,47 @@ function deleteLiveZone(freezerId, zoneId){
           prep.fluids=parsed; prep.norm=parsed.norm||null; prep.plates=1; prep.mode="serial";
           prep.excess=10; prep.minPip=1; prep.sources=[{name:srcName,n:parsed.length,id:srcId}];
         }
-        prep.excluded={}; savePrep(); refillFluids(); renderResults(); var _ex=document.getElementById("p-exc"); if(_ex) _ex.value=prep.excess; var _mp=document.getElementById("p-mpip"); if(_mp) _mp.value=prep.minPip; var _pv=document.getElementById("p-pval"); if(_pv) _pv.value=prep.plates; if(note){ var un=parsed.unsupported||[];
-        if(un.length){ note.className="p-note err";
-          note.textContent=(lang==="en"?"\u26a0 "+un.length+" fluid(s) IGNORED (unsupported): ":"\u26a0 "+un.length+" fluide(s) IGNORÉ(S) (non géré) : ")
+        prep.excluded={}; savePrep(); refillFluids(); renderResults();
+        // La pastille du protocole vit dans renderPrepTab : sans ce rendu, le
+        // .tdd importe restait sans etiquette et son bouton de retrait etait
+        // inaccessible jusqu'a un changement d'onglet.
+        setTimeout(function(){ try{ renderPrepTab(document.getElementById("canvas")); }catch(e){} }, 0);
+        var _ex=document.getElementById("p-exc"); if(_ex) _ex.value=prep.excess; var _mp=document.getElementById("p-mpip"); if(_mp) _mp.value=prep.minPip; var _pv=document.getElementById("p-pval"); if(_pv) _pv.value=prep.plates; var un=parsed.unsupported||[];
+        if(un.length){ PREP_NOTE={cls:"p-note err",
+          txt:(lang==="en"?"\u26a0 "+un.length+" fluid(s) IGNORED (unsupported): ":"\u26a0 "+un.length+" fluide(s) IGNORÉ(S) (non géré) : ")
             + un.map(function(u){return u.name+" ["+u.why+"]";}).slice(0,3).join(", ")
-            + (un.length>3?" \u2026":"") + (lang==="en"?" \u00b7 "+parsed.length+" others OK":" \u00b7 "+parsed.length+" autres OK");
-        } else { note.className="p-note ok";
-          note.textContent="\u2713 "+parsed.length+(lang==="en"?" fluids \u00b7 exact D300e load volumes":" fluides \u00b7 charges D300e exactes"); } } tf.value=""; }; rd.readAsText(file); }; } })();
+            + (un.length>3?" \u2026":"") + (lang==="en"?" \u00b7 "+parsed.length+" others OK":" \u00b7 "+parsed.length+" autres OK")};
+        } else { PREP_NOTE={cls:"p-note ok",
+          txt:"\u2713 "+parsed.length+(lang==="en"?" fluids \u00b7 exact D300e load volumes":" fluides \u00b7 charges D300e exactes")}; }
+        showPrepNote(); tf.value=""; }; rd.readAsText(file); }; } })();
     document.getElementById("p-clear").onclick=function(){ resetPrepRun(); refillFluids(); renderResults(); };
 
     renderResults();
+    showPrepNote();          // survit a la reconstruction de l'onglet
   }
 
+  /* Annulation symetrique : valider un run vide la prepa (resetPrepRun), donc
+     annuler restituait les aliquots mais laissait la liste des fluides vide —
+     il fallait reimporter le .tdd. L'instantane de la prepa voyage maintenant
+     avec celui de l'inventaire. */
+  window.__prepSnapshot=function(){ try{ return prepSnapshot(); }catch(e){ return null; } };
+  window.__prepRestore=function(sp){
+    try{
+      if(!sp) return;
+      prep.plates=sp.plates; prep.mode=sp.mode; prep.excess=sp.excess; prep.minPrep=sp.minPrep;
+      prep.maxPrep=sp.maxPrep; prep.minPip=sp.minPip; prep.load=sp.load;
+      prep.norm=sp.norm||null; prep.sources=sp.sources||[];
+      prep.tubesOv=sp.tubesOv||{}; prep.checks=sp.checks||{}; prep.excluded=sp.excluded||{};
+      prep.allowExpired=!!sp.allowExpired;
+      prep.fluids=(sp.fluids||[]).map(function(f){ var o={}; for(var k in f) o[k]=f[k]; o.id=uidp(); return o; });
+      for(var k1 in PREP_SPOT) delete PREP_SPOT[k1];
+      for(var k2 in PREP_LINK) delete PREP_LINK[k2];
+      if(sp.spotChoice) for(var a1 in sp.spotChoice) PREP_SPOT[a1]=sp.spotChoice[a1];
+      if(sp.linkChoice) for(var a2 in sp.linkChoice) PREP_LINK[a2]=sp.linkChoice[a2];
+      savePrep();
+      if(typeof view!=="undefined" && view.tab==="prep"){ refillFluids(); renderResults(); }
+    }catch(e){}
+  };
   window.renderPrepTab=renderPrepTab;
   window.__clearPrep=function(){ if(!prep.fluids.length && !prep.norm) return; resetPrepRun(); if(typeof view!=="undefined" && view.tab==="prep"){ if(typeof refillFluids==="function") refillFluids(); if(typeof renderResults==="function") renderResults(); } };
   var tp=document.getElementById("tabPrep"); if(tp) tp.onclick=function(){ if(view.tab!=="prep"){ view.tab="prep"; render(); } };

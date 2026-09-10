@@ -170,7 +170,7 @@ Les sauvegardes automatiques y vivent aussi : 10 points de retour au lieu de
 
 ```bash
 npm install
-npm test                 # 47 cas de régression, Playwright
+npm test                 # 75 cas de régression, Playwright
 ```
 
 Chaque cas reproduit un bug réellement observé avant de vérifier sa
@@ -180,3 +180,17 @@ temps — donc de vérifier la fusion et le temps réel sans réseau.
 
 Sur une machine sans Chromium par défaut :
 `CHROMIUM_PATH=/chemin/vers/chromium npm test`
+
+### Le moteur D300e
+
+`tests/fixtures/run-demo.tdd` est un protocole complet (2 plaques, 8 fluides
+DMSO et aqueux, dose-réponse 8 points, normalisation par backfill). La suite
+l'importe par le vrai chemin de l'interface et compare les charges obtenues à
+des valeurs **recalculées indépendamment** depuis la spécification écrite dans
+le code : 2 / 2 / 2 / 2 / 2,8 / 2,8 / 4 / 4 µL, véhicules DMSO 99 µL et
+Tween 14 µL.
+
+Portée exacte de cette vérification : elle valide *l'implémentation contre sa
+spécification*. Elle ne valide pas *la spécification contre le vrai
+dispenseur* — cela demanderait un rapport D300eControl réel à comparer, fluide
+par fluide.

@@ -7,6 +7,7 @@ const fs = require('fs');
 
 const APP = 'file://' + path.resolve(__dirname, '..', 'CryoMap-prep-d300e.html');
 const FAKE = fs.readFileSync(path.join(__dirname, 'fake-firestore.js'), 'utf8');
+const TDD = fs.readFileSync(path.join(__dirname, 'fixtures', 'run-demo.tdd'), 'utf8');
 const CHROME = process.env.CHROMIUM_PATH || undefined;
 
 let pass = 0, fail = 0;
@@ -736,6 +737,80 @@ const SEED = `(() => {
       /déplacés/.test(r.avertissement || '') && /SUPPRIMÉS/.test(r.avertissement || ''), r);
     check('redim. groupé : confirmation demandée avant de supprimer', r.demande === true, r);
     check('redim. groupé : refuser ne perd aucune fiche', r.intactApresRefus === 6, r);
+    await page.context().close();
+  }
+
+  /* ============ 8 sexies. Import .tdd de bout en bout ============
+     Le moteur D300e (charges par tête, normalisation par backfill) est ici
+     verrouillé sur des valeurs recalculées indépendamment, à la main, depuis
+     la spécification écrite dans le code. Cela vérifie l'implémentation
+     contre sa spécification — pas la spécification contre le vrai dispenseur,
+     ce qui demanderait un rapport D300eControl réel. */
+  {
+    const page = await newPage(browser);
+    const NOMS = ['Docetaxel','Gemcitabine','Sotorasib','Olaparib','SN-38',
+                  'Staurosporine','Trastuzumab deruxtecan','Datopotamab deruxtecan'];
+    await page.evaluate(noms => {
+      state.freezers = [{ id:'F1', name:'Congélateur', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      state.reagents = [];
+      noms.forEach((n, i) => { for (let k = 0; k < 3; k++) state.reagents.push({ id:'r'+i+k, name:n,
+        type:'Composé', lot:'L'+i, quantity:'30 µL', units:null, expiry:'2030-01-01',
+        loc:{ freezerId:'F1', zoneId:'Z', boxRow:i % 6, boxCol:(i/6)|0, row:k, col:0 } }); });
+      state.history = []; saveState(); view.tab = 'prep'; render();
+    }, NOMS);
+    await page.waitForTimeout(400);
+    await page.setInputFiles('#p-tddfile', { name:'run-demo.tdd', mimeType:'text/xml', buffer: Buffer.from(TDD) });
+    await page.waitForTimeout(2200);
+    const imp = await page.evaluate(() => {
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      return {
+        note: T(document.getElementById('p-parsenote')),
+        pastilles: Array.from(document.querySelectorAll('.p-src')).map(T),
+        charges: Array.from(document.querySelectorAll('#p-fluidBody tr'))
+          .map(tr => parseFloat(tr.querySelectorAll('input')[2].value)),
+        vehicules: Array.from(document.querySelectorAll('.p-grab-veh'))
+          .map(v => [T(v.querySelector('.p-gname')), T(v.querySelector('.p-ntube'))]),
+        cartes: Array.from(document.querySelectorAll('#p-grab .p-grab:not(.p-grab-veh)'))
+          .map(c => [T(c.querySelector('.p-gname')), T(c.querySelector('.p-approx'))]),
+        aLocaliser: document.querySelectorAll('#p-grab .p-locrow').length
+      };
+    });
+    check('.tdd : les 8 fluides sont importés', imp.charges.length === 8, imp.charges);
+    check('.tdd : charges D300e conformes au calcul indépendant',
+      JSON.stringify(imp.charges) === JSON.stringify([2,2,2,2,2.8,2.8,4,4]), imp.charges);
+    check('.tdd : véhicules de normalisation conformes (DMSO 99 µL, Tween 14 µL)',
+      imp.vehicules.length === 2 && imp.vehicules[0][1] === '99' && imp.vehicules[1][1] === '14', imp.vehicules);
+    check('.tdd : les 8 produits sont appariés exactement, rien à localiser',
+      imp.cartes.length === 8 && imp.cartes.every(c => c[1] === null) && imp.aLocaliser === 0, imp.cartes);
+    check('.tdd : le compte-rendu d’import reste affiché', /8 fluides/.test(imp.note || ''), imp.note);
+    check('.tdd : le protocole importé est étiqueté (donc retirable)',
+      imp.pastilles.length === 1 && /run-demo\.tdd/.test(imp.pastilles[0]), imp.pastilles);
+
+    // Valider le run, puis annuler : inventaire ET protocole doivent revenir
+    const cycle = await page.evaluate(async () => {
+      const avant = state.reagents.length;
+      document.getElementById('p-btnValidate').click();
+      await new Promise(r => setTimeout(r, 400));
+      document.getElementById('confirmOk').click();
+      await new Promise(r => setTimeout(r, 900));
+      const apresRun = state.reagents.length;
+      const fluidesApresRun = document.querySelectorAll('#p-fluidBody tr').length;
+      undo();
+      await new Promise(r => setTimeout(r, 700));
+      view.tab = 'prep'; render();
+      await new Promise(r => setTimeout(r, 400));
+      return { avant, apresRun, fluidesApresRun,
+               apresAnnulation: state.reagents.length,
+               fluidesApresAnnulation: document.querySelectorAll('#p-fluidBody tr').length,
+               chargesApresAnnulation: Array.from(document.querySelectorAll('#p-fluidBody tr'))
+                 .map(tr => parseFloat(tr.querySelectorAll('input')[2].value)) };
+    });
+    check('run : la validation retire un tube par produit',
+      cycle.apresRun === cycle.avant - 8 && cycle.fluidesApresRun === 0, cycle);
+    check('run : l’annulation rend les aliquots ET le protocole',
+      cycle.apresAnnulation === cycle.avant && cycle.fluidesApresAnnulation === 8
+      && JSON.stringify(cycle.chargesApresAnnulation) === JSON.stringify([2,2,2,2,2.8,2.8,4,4]), cycle);
     await page.context().close();
   }
 
