@@ -659,6 +659,86 @@ const SEED = `(() => {
     await page.context().close();
   }
 
+  /* ============ 8 quater. Cohérence du décompte des aliquots ============
+     Pour une même boîte, la carte de groupe annonçait « 5 aliquots » (elle
+     comptait les FICHES) et la prépa « 7 en stock » (les vrais aliquots).
+     Même forme de confusion que le 13 contre 25 signalé sur le terrain. */
+  {
+    const page = await newPage(browser);
+    const r = await page.evaluate(async () => {
+      state.freezers = [{ id:'F1', name:'Congélateur', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      // 3 fiches non suivies + 1 fiche de 4 aliquots + 1 fiche épuisée = 7 aliquots sur 5 positions
+      state.reagents = [0,1,2].map(i => ({ id:'u'+i, name:'Sotorasib', lot:'L1', type:'Inh', quantity:'30 µL',
+        units:null, loc:{freezerId:'F1',zoneId:'Z',boxRow:0,boxCol:0,row:0,col:i} }));
+      state.reagents.push({ id:'u4', name:'Sotorasib', lot:'L1', type:'Inh', quantity:'30 µL', units:4,
+        loc:{freezerId:'F1',zoneId:'Z',boxRow:0,boxCol:0,row:0,col:3} });
+      state.reagents.push({ id:'u5', name:'Sotorasib', lot:'L1', type:'Inh', quantity:'30 µL', units:0,
+        loc:{freezerId:'F1',zoneId:'Z',boxRow:0,boxCol:0,row:0,col:4} });
+      state.history = []; saveState();
+      view.tab='map'; view.freezerId='F1'; view.zoneId='Z'; view.level='box'; view.boxRow=0; view.boxCol=0;
+      render(); await new Promise(r => setTimeout(r, 250));
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      const carte = T(document.querySelector('#boxContents .aliq-count'));
+      const stats = T(document.querySelector('#statsPanel .stat-row .val'));
+      const volume = T(document.querySelector('#boxContents .aliq-total-line'));
+      view.tab='prep'; render(); await new Promise(r => setTimeout(r, 300));
+      document.getElementById('p-clear').click(); await new Promise(r => setTimeout(r, 200));
+      document.getElementById('p-addfluid').click();
+      const i = document.querySelector('#p-fluidBody tr').querySelectorAll('input');
+      i[0].value='Sotorasib'; i[0].dispatchEvent(new Event('input',{bubbles:true}));
+      i[1].value='mère'; i[1].dispatchEvent(new Event('input',{bubbles:true}));
+      i[2].value='100'; i[2].dispatchEvent(new Event('input',{bubbles:true}));
+      await new Promise(r => setTimeout(r, 550));
+      const prepa = T(document.querySelector('#p-grab .stk'));
+      return { carte, stats, prepa, volume };
+    });
+    check('décompte : la carte de boîte annonce les aliquots, pas les fiches',
+      /^7 aliquots/.test(r.carte || '') && /5 pos/.test(r.carte || ''), r);
+    check('décompte : statistiques et prépa donnent le même nombre',
+      r.stats === '7' && /\b7\b/.test(r.prepa || ''), r);
+    check('décompte : le volume total tient compte des fiches multi-aliquots',
+      /210/.test(r.volume || ''), r);
+    await page.context().close();
+  }
+
+  /* ============ 8 quinquies. Redimensionnement groupé de boîtes ============ */
+  {
+    const page = await newPage(browser);
+    const r = await page.evaluate(async () => {
+      state.freezers = [{ id:'F1', name:'Congélateur', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      // 6 fiches dans une boîte, dont 3 hors bornes après passage en 2×2
+      state.reagents = [];
+      [[0,0],[0,1],[1,0],[8,8],[7,7],[6,6]].forEach((rc, i) => state.reagents.push({
+        id:'b'+i, name:'Aliquot '+i, quantity:'30 µL', units:null,
+        loc:{ freezerId:'F1', zoneId:'Z', boxRow:0, boxCol:0, row:rc[0], col:rc[1] } }));
+      state.history = []; saveState();
+      view.tab='map'; view.freezerId='F1'; view.zoneId='Z'; view.level='rack';
+      view.selectedBoxes = new Set(['0,0']); render();
+      await new Promise(r => setTimeout(r, 200));
+      openBulkResizeModal('F1', 'Z');
+      document.getElementById('bulkResizeRows').value = 2;
+      document.getElementById('bulkResizeCols').value = 2;
+      document.getElementById('bulkResizeRows').dispatchEvent(new Event('change', { bubbles:true }));
+      await new Promise(r => setTimeout(r, 200));
+      const avertissement = (document.getElementById('bulkResizeOrphansWarn')||{}).textContent;
+      document.getElementById('btnBulkResizeApply').click();
+      await new Promise(r => setTimeout(r, 300));
+      const demande = document.getElementById('confirmModal').classList.contains('show');
+      const texte = document.getElementById('confirmBody').textContent;
+      document.getElementById('confirmCancel').click();
+      await new Promise(r => setTimeout(r, 250));
+      const intact = state.reagents.length;
+      return { avertissement, demande, texte: (texte||'').slice(0,120), intactApresRefus: intact };
+    });
+    check('redim. groupé : l’avertissement chiffre déplacements ET suppressions',
+      /déplacés/.test(r.avertissement || '') && /SUPPRIMÉS/.test(r.avertissement || ''), r);
+    check('redim. groupé : confirmation demandée avant de supprimer', r.demande === true, r);
+    check('redim. groupé : refuser ne perd aucune fiche', r.intactApresRefus === 6, r);
+    await page.context().close();
+  }
+
   /* ============ 9. Un deuxième poste rejoint la salle ============ */
   {
     const page = await newPage(browser, true);

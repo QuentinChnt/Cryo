@@ -2242,6 +2242,9 @@ header.topbar { background: var(--paper); border-bottom: 1px solid var(--rule-2)
    .item-card et .cg-card). Le min-height réel de .cg-card est défini plus bas
    (112 px), qui l'emportait déjà au repos : rien à conserver ici. */
 
+.aliq-pos { font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+  color: var(--ink-3); opacity: .85; margin-left: 3px; }
+
 /* Nom rapproche par approximation : l'operateur doit VOIR que le produit
    retenu n'est pas exactement celui demande par le protocole. */
 .p-approx { display:inline-flex; align-items:center; gap:4px; margin-left:6px;
@@ -6256,7 +6259,8 @@ const I18N = {
     sectionFreezers: 'Congélateurs',
     sectionStats: 'Statistiques',
     sectionWatch: 'Surveillance',
-    statTotal: 'Total items',
+    statTotal: 'Total aliquots',
+    statTotalTitle: 'Aliquots disponibles, toutes fiches confondues. {n} fiches enregistrées.',
     statFreezers: 'Congélateurs',
     statExpiring: 'Bientôt expirés',
     statExpired: 'Expirés',
@@ -6509,6 +6513,8 @@ const I18N = {
     perUnitSuffix: '/u',
     aliquotWord: 'aliquot',
     aliquotsWord: 'aliquots',
+    aliqPosShort: 'sur {p} pos.',
+    aliqPosTitle: '{a} aliquots répartis sur {p} positions (certaines fiches en portent plusieurs).',
     addAliquotBtn: 'Ajouter un aliquot',
     removeAliquotBtn: 'Retirer un aliquot',
     boxFullAliquot: 'Boîte pleine — aucune cellule libre',
@@ -6702,7 +6708,8 @@ const I18N = {
     sectionFreezers: 'Freezers',
     sectionStats: 'Statistics',
     sectionWatch: 'Watch',
-    statTotal: 'Total items',
+    statTotal: 'Total aliquots',
+    statTotalTitle: 'Available aliquots across all records. {n} records stored.',
     statFreezers: 'Freezers',
     statExpiring: 'Expiring soon',
     statExpired: 'Expired',
@@ -6955,6 +6962,8 @@ const I18N = {
     perUnitSuffix: '/u',
     aliquotWord: 'aliquot',
     aliquotsWord: 'aliquots',
+    aliqPosShort: 'in {p} pos.',
+    aliqPosTitle: '{a} aliquots across {p} positions (some records hold several).',
     addAliquotBtn: 'Add an aliquot',
     removeAliquotBtn: 'Remove an aliquot',
     boxFullAliquot: 'Box full — no free cell',
@@ -7405,20 +7414,21 @@ function openBulkResizeModal(freezerId, zoneId) {
   const computeWarning = () => {
     const newR = Math.max(1, parseInt(document.getElementById('bulkResizeRows').value) || 1);
     const newC = Math.max(1, parseInt(document.getElementById('bulkResizeCols').value) || 1);
-    let orphans = 0;
-    view.selectedBoxes.forEach(key => {
-      const [bR, bC] = key.split(',').map(Number);
-      reagentsInBox(freezerId, zoneId, bR, bC).forEach(r => {
-        if (r.loc.row >= newR || r.loc.col >= newC) orphans++;
-      });
-    });
+    const plan = planBulkResize(freezerId, zoneId, newR, newC);
     const warnEl = document.getElementById('bulkResizeOrphansWarn');
-    if (orphans > 0) {
-      warnEl.textContent = t('boxBulkResizeOrphans', {n: orphans, s: orphans>1?'s':''});
-      warnEl.style.display = '';
-    } else {
-      warnEl.style.display = 'none';
-    }
+    const en = lang === 'en';
+    if (!plan.moved.length && !plan.dropped.length) { warnEl.style.display = 'none'; return; }
+    // On chiffre separement les deplacements et les SUPPRESSIONS : l'ancien
+    // message melangeait les deux (« ou supprimes si pas de place »).
+    const parts = [];
+    if (plan.moved.length) parts.push(en
+      ? `${plan.moved.length} aliquot${plan.moved.length>1?'s':''} will be relocated to free positions`
+      : `${plan.moved.length} aliquot${plan.moved.length>1?'s':''} seront déplacés vers des positions libres`);
+    if (plan.dropped.length) parts.push(en
+      ? `${plan.dropped.length} will be DELETED (no space left)`
+      : `${plan.dropped.length} seront SUPPRIMÉS (plus de place)`);
+    warnEl.textContent = '⚠ ' + parts.join(' · ');
+    warnEl.style.display = '';
   };
   document.getElementById('bulkResizeRows').onchange = computeWarning;
   document.getElementById('bulkResizeCols').onchange = computeWarning;
@@ -7427,43 +7437,62 @@ function openBulkResizeModal(freezerId, zoneId) {
   document.getElementById('bulkResizeModal').classList.add('show');
 }
 
-function applyBulkResize(freezerId, zoneId) {
+/* Plan de redimensionnement groupe : dit exactement ce qui sera deplace et ce
+   qui ne rentre nulle part. L'avertissement de la fenetre et l'action partagent
+   ce calcul, ils ne peuvent donc plus se contredire — l'ancien message disait
+   « deplaces ou supprimes si pas de place » sans jamais chiffrer les
+   suppressions, et rien ne demandait confirmation. */
+function planBulkResize(freezerId, zoneId, newR, newC) {
+  const z = state.freezers.find(f => f.id === freezerId)?.zones.find(zz => zz.id === zoneId);
+  const moved = [], dropped = [];
+  if (!z || !view.selectedBoxes) return { moved, dropped };
+  view.selectedBoxes.forEach(key => {
+    const [bR, bC] = key.split(',').map(Number);
+    const inBox = reagentsInBox(freezerId, zoneId, bR, bC);
+    const oob = inBox.filter(r => r.loc.row >= newR || r.loc.col >= newC);
+    if (!oob.length) return;
+    const occupied = new Set(inBox.filter(r => r.loc.row < newR && r.loc.col < newC)
+                                  .map(r => r.loc.row + ',' + r.loc.col));
+    oob.forEach(r => {
+      let spot = null;
+      for (let row = 0; row < newR && !spot; row++) for (let col = 0; col < newC && !spot; col++)
+        if (!occupied.has(row + ',' + col)) spot = { row, col };
+      if (spot) { occupied.add(spot.row + ',' + spot.col); moved.push({ r, spot }); }
+      else dropped.push(r);
+    });
+  });
+  return { moved, dropped };
+}
+
+async function applyBulkResize(freezerId, zoneId) {
   const newR = Math.max(1, parseInt(document.getElementById('bulkResizeRows').value) || 1);
   const newC = Math.max(1, parseInt(document.getElementById('bulkResizeCols').value) || 1);
   const z = state.freezers.find(f => f.id === freezerId)?.zones.find(zz => zz.id === zoneId);
   if (!z) return;
   const n = view.selectedBoxes.size;
+  const plan = planBulkResize(freezerId, zoneId, newR, newC);
+  if (plan.dropped.length) {
+    const en = lang === 'en', k = plan.dropped.length;
+    const noms = plan.dropped.slice(0, 3).map(r => r.name).join(', ') + (k > 3 ? '…' : '');
+    const ok = await customConfirm(
+      en ? 'Aliquots that no longer fit' : 'Aliquots qui ne rentrent plus',
+      en ? `${k} aliquot${k>1?'s':''} cannot be placed in the resized boxes and will be DELETED: ${noms}. `
+           + `${plan.moved.length} other${plan.moved.length>1?'s':''} will be relocated. Undo stays available.`
+         : `${k} aliquot${k>1?'s':''} ne peuvent être placés dans les boîtes redimensionnées et seront SUPPRIMÉS : ${noms}. `
+           + `${plan.moved.length} autre${plan.moved.length>1?'s':''} seront déplacés. L'annulation reste possible.`,
+      en ? 'Delete and resize' : 'Supprimer et redimensionner');
+    if (!ok) return;
+  }
   pushUndo(t('historyBulkResize', {n, s: n>1?'s':'', gr: newR, gc: newC, zone: z.name}));
-  // Apply dimensions to each selected box
   view.selectedBoxes.forEach(key => {
     const [bR, bC] = key.split(',').map(Number);
     setBoxDims(z, bR, bC, newR, newC);
-    // Handle out-of-bounds reagents: try to relocate, else drop
-    const oobReagents = reagentsInBox(freezerId, zoneId, bR, bC).filter(r => r.loc.row >= newR || r.loc.col >= newC);
-    if (oobReagents.length === 0) return;
-    const inBoundsOccupied = new Set(
-      reagentsInBox(freezerId, zoneId, bR, bC)
-        .filter(r => r.loc.row < newR && r.loc.col < newC)
-        .map(r => `${r.loc.row},${r.loc.col}`)
-    );
-    oobReagents.forEach(r => {
-      let placed = false;
-      for (let row = 0; row < newR && !placed; row++) {
-        for (let col = 0; col < newC && !placed; col++) {
-          if (!inBoundsOccupied.has(`${row},${col}`)) {
-            r.loc.row = row;
-            r.loc.col = col;
-            inBoundsOccupied.add(`${row},${col}`);
-            placed = true;
-          }
-        }
-      }
-      if (!placed) {
-        // Remove the reagent
-        state.reagents = state.reagents.filter(rr => rr.id !== r.id);
-      }
-    });
   });
+  plan.moved.forEach(m => { m.r.loc.row = m.spot.row; m.r.loc.col = m.spot.col; });
+  if (plan.dropped.length) {
+    const ids = new Set(plan.dropped.map(r => r.id));
+    state.reagents = state.reagents.filter(r => !ids.has(r.id));
+  }
   logAction('historyBulkResize', {n, s: n>1?'s':'', gr: newR, gc: newC, zone: z.name});
   saveState();
   document.getElementById('bulkResizeModal').classList.remove('show');
@@ -9333,6 +9362,18 @@ function fmtNum(n) {
   if (!isFinite(n)) return String(n);
   return Number.isInteger(n) ? String(n) : parseFloat(n.toFixed(3)).toString();
 }
+/* Combien d'aliquots porte UNE fiche.
+   « units » null = non suivi, donc un tube physique. Un nombre = autant
+   d'aliquots restants. 0 = fiche epuisee.
+   Cette regle vivait dupliquee et divergente : la vue boite comptait les
+   FICHES en les appelant « aliquots », la prepa comptait les vrais aliquots.
+   Pour la meme boite, l'une annoncait « 5 aliquots » et l'autre « 7 en stock ». */
+function aliquotCount(r) {
+  if (!r) return 0;
+  return (r.units == null) ? 1 : Math.max(0, Number(r.units) || 0);
+}
+function aliquotsIn(list) { return (list || []).reduce((a, r) => a + aliquotCount(r), 0); }
+
 function groupBoxItems(items) {
   const map = new Map();
   items.forEach(r => {
@@ -9342,17 +9383,24 @@ function groupBoxItems(items) {
   });
   const groups = [...map.values()];
   groups.forEach(g => {
-    g.count = g.items.length;
-    // Per-aliquot quantity from the first item that has a parseable quantity
+    g.positions = g.items.length;          // cases occupees dans la boite
+    g.aliquots = aliquotsIn(g.items);      // aliquots reellement disponibles
+    g.count = g.aliquots;
     let per = null;
     for (const it of g.items) { const p = parseQty(it.quantity); if (p) { per = p; break; } }
     g.per = per;
     if (per) {
-      // Uniform aliquots → sum parseable matching-unit values; fall back to count × per if some are missing/mismatched
+      // Le total multiplie chaque fiche par SES aliquots : une fiche portant
+      // 4 aliquots de 30 µL vaut 120 µL, pas 30. L'ancien calcul sommait une
+      // fois par fiche et sous-estimait le volume disponible.
       let sum = 0, allMatch = true;
-      for (const it of g.items) { const p = parseQty(it.quantity); if (p && p.unit === per.unit) sum += p.value; else allMatch = false; }
+      for (const it of g.items) {
+        const p = parseQty(it.quantity);
+        if (p && p.unit === per.unit) sum += p.value * aliquotCount(it);
+        else allMatch = false;
+      }
       g.unit = per.unit;
-      g.total = allMatch ? sum : g.count * per.value;
+      g.total = allMatch ? sum : g.aliquots * per.value;
     } else {
       g.unit = null; g.total = null;
     }
@@ -9447,7 +9495,7 @@ function aliquotGroupsHtml(items) {
     return `<div class="aliq-group${stripCls}${selCls}" data-aliq-rep="${g.rep.id}">
       <div class="aliq-main">
         <div class="aliq-name">${escapeHtml(g.name || '—')}</div>
-        <div class="aliq-meta"><span class="aliq-count">${g.count} ${t(g.count > 1 ? 'aliquotsWord' : 'aliquotWord')}</span>${perLine}</div>
+        <div class="aliq-meta"><span class="aliq-count"${g.positions !== g.aliquots ? ` title="${escapeHtml(t('aliqPosTitle', {p: g.positions, a: g.aliquots}))}"` : ''}>${g.aliquots} ${t(g.aliquots > 1 ? 'aliquotsWord' : 'aliquotWord')}${g.positions !== g.aliquots ? ` <span class="aliq-pos">${t('aliqPosShort', {p: g.positions})}</span>` : ''}</span>${perLine}</div>
         ${totalLine}
         ${g.lot ? `<div class="aliq-lot">${t('sLot')} ${escapeHtml(g.lot)}</div>` : ''}
       </div>
@@ -9777,7 +9825,7 @@ function renderSidebar() {
   const expired = state.reagents.filter(r => expiryStatus(r.expiry) === 'expired').length;
   const expiring = state.reagents.filter(r => expiryStatus(r.expiry) === 'expiring').length;
   sp.innerHTML = `
-    <div class="stat-row"><span>${t('statTotal')}</span><span class="val">${total}</span></div>
+    <div class="stat-row" title="${escapeHtml(t('statTotalTitle', {n: state.reagents.length}))}"><span>${t('statTotal')}</span><span class="val">${aliquotsIn(state.reagents)}</span></div>
     <div class="stat-row"><span>${t('statFreezers')}</span><span class="val">${state.freezers.length}</span></div>
     <div class="stat-row"><span>${t('statExpiring')}</span><span class="val ${expiring?'warn':''}">${expiring}</span></div>
     <div class="stat-row"><span>${t('statExpired')}</span><span class="val ${expired?'danger':''}">${expired}</span></div>
