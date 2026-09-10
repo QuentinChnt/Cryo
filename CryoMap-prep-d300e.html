@@ -8524,7 +8524,20 @@ async function fbMigrateLegacy(meta) {
     _fb.applyingRemote = false;
     _fb.shadow = fbNewShadow();          // rien n'existe encore en sous-collections
     _fb.initialized = true; _fb.readDone = true;
-    await fbPushNow();                   // ecrit tout, en lots
+    const pushed = await fbPushNow();    // ecrit tout, en lots
+    if (!pushed) {
+      // Cas le plus probable : les regles Firestore ne couvrent pas encore les
+      // sous-collections. On NE TOUCHE PAS a l'ancien champ `state` : il reste
+      // la seule copie partagee, les postes encore sur l'ancienne version
+      // continuent de fonctionner, et il suffit de corriger les regles puis de
+      // recharger. Sans ce garde-fou, le champ etait supprime alors que rien
+      // n'avait ete ecrit a la place.
+      _fb.initialized = false; _fb.readDone = false; _fb.shadow = null;
+      fbStopListening();
+      schedulePersist();
+      render();
+      return false;
+    }
     await fbRoom().set({ schema: FB_SCHEMA, updatedAt: Date.now(),
       state: firebase.firestore.FieldValue.delete() }, { merge: true });
     schedulePersist();
@@ -8677,7 +8690,7 @@ function fbSchedulePush() {
 }
 
 async function fbPushNow() {
-  if (!_fb.db || !_fb.room || !_fb.shadow) return;
+  if (!_fb.db || !_fb.room || !_fb.shadow) return false;
   const local = fbLocalSnapshot();
   const ops = [];
   const plan = (kind, colName) => {
@@ -8693,7 +8706,7 @@ async function fbPushNow() {
   plan('inventory', 'inventory');
   plan('history', 'history');
   plan('meta', 'meta');
-  if (!ops.length) { fbSetStatus('synced'); return; }
+  if (!ops.length) { fbSetStatus('synced'); return true; }
   try {
     for (let i = 0; i < ops.length; i += FB_BATCH_MAX) {
       const chunk = ops.slice(i, i + FB_BATCH_MAX);
@@ -8709,9 +8722,11 @@ async function fbPushNow() {
     }
     await fbRoom().set({ schema: FB_SCHEMA, updatedAt: Date.now() }, { merge: true });
     fbSetStatus('synced');
+    return true;
   } catch (e) {
     console.error('[CryoMap] Push error:', e);
     fbReportAccessError(e);
+    return false;      // l'appelant DOIT pouvoir savoir : voir fbMigrateLegacy
   }
 }
 

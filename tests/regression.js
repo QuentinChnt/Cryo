@@ -468,6 +468,32 @@ const SEED = `(() => {
     });
     check('synchro : migration depuis l’ancien document unique',
       mig.ok && mig.aliquots === 5 && mig.docs === 5 && mig.schema === 2 && mig.ancienChampRetire && mig.initiales === 'AB', mig);
+
+    // Règles Firestore pas encore à jour : la migration doit échouer SANS
+    // toucher à l'ancien champ, seule copie partagée de l'équipe.
+    expectErrors = true;
+    const refus = await page.evaluate(async () => {
+      __fs.reset(); fbDisconnect(); localStorage.clear();
+      const ancien = { freezers: state.freezers, reagents: state.reagents.slice(0, 3),
+        inventory: [], history: [], preferences: { initials:'CD', colorByType:false } };
+      __fs.seedLegacy('salle3', ancien);
+      // on refuse toute écriture, comme le feraient des règles non mises à jour
+      const vraiBatch = firebase.firestore().batch;
+      firebase.firestore().batch = function () {
+        return { set(){}, delete(){}, commit: async () => { const e = new Error('refuse'); e.code = 'permission-denied'; throw e; } };
+      };
+      const ok = await fbConnect(JSON.stringify({ projectId:'demo', apiKey:'k' }), 'salle3', true);
+      await new Promise(r => setTimeout(r, 1500));
+      firebase.firestore().batch = vraiBatch;
+      const head = __fs.get('cryomap/salle3');
+      return { connecte: ok, ancienChampIntact: !!(head && head.state),
+               aucunDocEcrit: __fs.count('cryomap/salle3/reagents/') === 0,
+               messageRegles: Array.from(document.querySelectorAll('#toastContainer .toast'))
+                 .some(t => /cryomap\/\{room\}/.test(t.textContent)) };
+    });
+    expectErrors = false;
+    check('synchro : règles non à jour ⇒ ancien champ préservé et message actionnable',
+      !refus.connecte && refus.ancienChampIntact && refus.aucunDocEcrit && refus.messageRegles, refus);
     await page.context().close();
   }
 
