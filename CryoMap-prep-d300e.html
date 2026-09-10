@@ -2242,6 +2242,13 @@ header.topbar { background: var(--paper); border-bottom: 1px solid var(--rule-2)
    .item-card et .cg-card). Le min-height réel de .cg-card est défini plus bas
    (112 px), qui l'emportait déjà au repos : rien à conserver ici. */
 
+/* Nom rapproche par approximation : l'operateur doit VOIR que le produit
+   retenu n'est pas exactement celui demande par le protocole. */
+.p-approx { display:inline-flex; align-items:center; gap:4px; margin-left:6px;
+  font-family: var(--mono); font-size:10px; font-weight:700; padding:1px 6px;
+  border-radius: var(--r-xs); background: var(--warn-bg); color: var(--warn);
+  border:1px solid var(--warn-soft); cursor:help; vertical-align:middle; }
+
 /* Bandeau d'echec d'enregistrement : le seul message permanent de l'app.
    Il reste a l'ecran tant que rien n'est ecrit, contrairement a un toast. */
 #persistBanner { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
@@ -14080,9 +14087,42 @@ function deleteLiveZone(freezerId, zoneId){
   var DRUGALIAS={"oxaliplatine":"oxaliplatin","cisplatine":"cisplatin","ada":"adagrasib","fluorouracil":"5fu","fluorouracile":"5fu","mitomycine":"mitomycinc"};
   function normDrug(s){ return (s==null?"":String(s)).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,""); }
   function lev(a,b){ var m=a.length,n=b.length; if(!m)return n; if(!n)return m; var d=[],i,j; for(i=0;i<=m;i++)d[i]=[i]; for(j=0;j<=n;j++)d[0][j]=j; for(i=1;i<=m;i++)for(j=1;j<=n;j++){ var c=a.charAt(i-1)===b.charAt(j-1)?0:1; d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+c); } return d[m][n]; }
-  function fuzzyInv(k, im){ if(!k) return null; if(im[k]) return im[k]; var keys=Object.keys(im), best=null, bestScore=1e9;
-    keys.forEach(function(kk){ if(kk===k){ best=im[kk]; bestScore=0; return; } var minL=Math.min(k.length,kk.length), maxL=Math.max(k.length,kk.length), d=lev(k,kk), score=null; if((minL>=8&&d<=2)||(minL>=5&&d<=1)) score=10+d; else if(minL>=5 && (kk.indexOf(k)>=0||k.indexOf(kk)>=0) && (maxL-minL)<=maxL*0.6) score=20+(maxL-minL); if(score!=null && score<bestScore){ bestScore=score; best=im[kk]; } });
-    return best; }
+  /* Signature chiffree d'un nom : "deruxtecanisotypedar8" -> "8".
+     Deux produits dont les chiffres different ne sont JAMAIS le meme produit. */
+  function digitsOf(k){ return (String(k).match(/[0-9]+/g) || []).join('.'); }
+
+  /* Appariement approche entre le nom d'un fluide du .tdd et un produit de
+     l'inventaire.
+
+     L'ancienne version acceptait jusqu'a DEUX substitutions de caracteres pour
+     un nom de 8 caracteres ou plus. Or « deruxtecanisotypedar4 » et
+     « deruxtecanisotypedar8 » ne different que d'UN caractere : demander du
+     DAR8 renvoyait le stock ET L'EMPLACEMENT du DAR4, sous le nom DAR8.
+     L'operateur etait envoye a la mauvaise boite. Meme piege pour
+     ASP3082/ASP4396, RMC-6236/RMC-6291, et tout produit numerote.
+
+     Deux garde-fous :
+       - les chiffres des deux noms doivent etre identiques ;
+       - en cas de candidats a egalite, on ne devine pas : le produit est
+         declare absent, et l'operateur l'associe lui-meme (le choix est
+         memorise, et la validation du run reste bloquee entre-temps). */
+  function fuzzyInv(k, im){
+    if(!k) return null;
+    if(im[k]) return im[k];
+    var kd = digitsOf(k);
+    var best=null, bestScore=1e9, bestKey=null, ties=0;
+    Object.keys(im).forEach(function(kk){
+      if(digitsOf(kk) !== kd) return;                     // chiffres differents -> jamais le meme produit
+      var minL=Math.min(k.length,kk.length), maxL=Math.max(k.length,kk.length), d=lev(k,kk), score=null;
+      if((minL>=8&&d<=2)||(minL>=5&&d<=1)) score=10+d;
+      else if(minL>=5 && (kk.indexOf(k)>=0||k.indexOf(kk)>=0) && (maxL-minL)<=maxL*0.6) score=20+(maxL-minL);
+      if(score==null) return;
+      if(score<bestScore){ bestScore=score; best=im[kk]; bestKey=kk; ties=1; }
+      else if(score===bestScore && kk!==bestKey){ ties++; }
+    });
+    if(ties>1) return null;                               // ambigu : on ne tranche pas a sa place
+    return best;
+  }
   function drugDiluent(name){ var k=normDrug(name); if(DRUGDIL[k]) return DRUGDIL[k]; var a=DRUGALIAS[k]; if(a&&DRUGDIL[a]) return DRUGDIL[a]; return "DMSO"; }
   var PKEY="cryomap-prep-run-v2";
   var _n=1; function uidp(){ return "p"+(_n++)+Date.now().toString(36); }
@@ -14456,10 +14496,26 @@ function deleteLiveZone(freezerId, zoneId){
       var sp=e.spots[key]||{key:key,lo:lo,cnt:0,items:[],vol:null}; sp.cnt++;
       if(sp.vol==null){ var _sv=parseAliqVol(r.quantity); if(_sv) sp.vol=_sv; } sp.items.push({id:r.id,expiry:r.expiry||null,lot:r.lot||null,aliquotDate:r.aliquotDate||null,row:(r.loc&&r.loc.row!=null)?r.loc.row:null,col:(r.loc&&r.loc.col!=null)?r.loc.col:null}); e.spots[key]=sp; });
     var map={}; Object.keys(byName).forEach(function(k){ var e=byName[k]; var best=Object.keys(e.spots).map(function(kk){return e.spots[kk];}).sort(function(a,b){return b.cnt-a.cnt;})[0]; var allSpots=Object.keys(e.spots).map(function(kk){return e.spots[kk];}).sort(function(a,b){return b.cnt-a.cnt;});map[k]={name:e.name,stock:e.total,loc:best?best.lo:null,spots:allSpots,diluent:e.dil,code:e.code||null,alias:e.alias||null,aliqVol:e.aliqVol||null}; });
-    Object.keys(byName).forEach(function(fk){ var nm=byName[fk].name||""; var pre=nm.replace(/\s*[\(\[].*$/,"").trim(); var pk=normDrug(pre); if(pk&&pk!==fk&&!map[pk]) map[pk]=map[fk]; var mm,re=/[\(\[]([^\)\]]+)[\)\]]/g; while((mm=re.exec(nm))){ var ck=normDrug(mm[1]); if(ck&&!map[ck]) map[ck]=map[fk]; } });
-    Object.keys(byName).forEach(function(fk){ var e=byName[fk];
-      if(e.alias){ String(e.alias).split(/[,;/]+/).forEach(function(a){ var ak=normDrug(a); if(ak&&!map[ak]) map[ak]=map[fk]; }); }
-      if(e.code){ var ck=normDrug(e.code); if(ck&&ck.length>=2&&!map[ck]) map[ck]=map[fk]; }
+    /* Alias : nom sans parenthese, jetons entre parentheses, champs Alias et
+       Code. Un alias revendique par PLUSIEURS produits ne designe personne :
+       le garder ferait pointer « dar8 » vers le premier produit rencontre,
+       arbitrairement. On les recense d'abord, on ne garde que les uniques. */
+    var claims = {};
+    var claim = function(key, fk){ if(!key) return; (claims[key] = claims[key] || {})[fk] = 1; };
+    Object.keys(byName).forEach(function(fk){
+      var nm = byName[fk].name || "";
+      claim(normDrug(nm.replace(/\s*[\(\[].*$/, "").trim()), fk);
+      var mm, re = /[\(\[]([^\)\]]+)[\)\]]/g;
+      while ((mm = re.exec(nm))) claim(normDrug(mm[1]), fk);
+      var e = byName[fk];
+      if (e.alias) String(e.alias).split(/[,;/]+/).forEach(function(x){ claim(normDrug(x), fk); });
+      if (e.code) { var ck = normDrug(e.code); if (ck && ck.length >= 2) claim(ck, fk); }
+    });
+    Object.keys(claims).forEach(function(key){
+      var owners = Object.keys(claims[key]);
+      if (owners.length !== 1) return;            // ambigu : pas d'alias
+      if (map[key]) return;                       // un vrai produit porte deja ce nom
+      map[key] = map[owners[0]];
     });
     return map;
   }
@@ -14569,7 +14625,11 @@ function deleteLiveZone(freezerId, zoneId){
   function groupResults(){
     var plates=Math.max(1,Number(prep.plates)||1); var im=liveInventory(); var groups={};
     prep.fluids.forEach(function(f,i){ var name=(f.drug||"").trim(); if(!name) return; var key=normDrug(name); if(!groups[key]) groups[key]={name:name,items:[],idx:i}; groups[key].items.push(f); });
-    var results=[]; Object.keys(groups).forEach(function(k){ var g=groups[k]; var inv=(PREP_LINK[k]&&im[PREP_LINK[k]])||im[k]||fuzzyInv(k,im)||null; var fmap={}; var missingConc=false, any=false; var groupSol=null, concByFactor={}, concUnit=null;
+    var results=[]; Object.keys(groups).forEach(function(k){ var g=groups[k]; var _linked=(PREP_LINK[k]&&im[PREP_LINK[k]])||null, _exact=im[k]||null;
+      var inv=_linked||_exact||fuzzyInv(k,im)||null;
+      // Comment le produit a-t-il ete identifie ? Un rapprochement approche
+      // doit se VOIR : c'est le silence qui rendait la confusion dangereuse.
+      var _match=_linked?'manuel':(_exact?'exact':(inv?'approche':'absent')); var fmap={}; var missingConc=false, any=false; var groupSol=null, concByFactor={}, concUnit=null;
       g.items.forEach(function(f){ var load=((f.load===""||f.load==null)?(Number(prep.load)||50):(Number(f.load)||0))*plates; var d=interpretDil(f.dil); var factor=null;
         if(d&&d.factor!=null) factor=d.factor; else if(d&&d.conc!=null) missingConc=true;
         if(factor!=null&&factor>=1){ fmap[factor]=(fmap[factor]||0)+load; any=true; if(f.conc!=null) concByFactor[factor]=f.conc; }
@@ -14580,7 +14640,7 @@ function deleteLiveZone(freezerId, zoneId){
       r.name=g.name;
       // Surcharge manuelle du nombre de tubes (prime sur le calcul)
       var _ovK=normDrug(g.name||"");
-      var _ovT=prepTubes(); if(_ovT[_ovK]!=null){ r.tubes=_ovT[_ovK]; r.tubesManual=true; } r._idx=g.idx; r.inv=inv; r.stock=inv?inv.stock:null; r.ambiguous=isAmbiguousSpot(inv); r.loc=inv?spotFor(inv):null; r.spot=spotOf(inv); r.exp=spotExpiryState(r.spot); r.code=inv?inv.code:null; r.diluent=groupSol||(inv?inv.diluent:drugDiluent(g.name)); r.concUnit=concUnit; if(r.nodes) r.nodes.forEach(function(n){ if(concByFactor[n.factor]!=null) n.conc=concByFactor[n.factor]; }); r.missingConc=missingConc; r.hasData=any; results.push(r); });
+      var _ovT=prepTubes(); if(_ovT[_ovK]!=null){ r.tubes=_ovT[_ovK]; r.tubesManual=true; } r._idx=g.idx; r.inv=inv; r.match=_match; r.invName=inv?inv.name:null; r.stock=inv?inv.stock:null; r.ambiguous=isAmbiguousSpot(inv); r.loc=inv?spotFor(inv):null; r.spot=spotOf(inv); r.exp=spotExpiryState(r.spot); r.code=inv?inv.code:null; r.diluent=groupSol||(inv?inv.diluent:drugDiluent(g.name)); r.concUnit=concUnit; if(r.nodes) r.nodes.forEach(function(n){ if(concByFactor[n.factor]!=null) n.conc=concByFactor[n.factor]; }); r.missingConc=missingConc; r.hasData=any; results.push(r); });
     results.sort(function(a,b){return (a._idx||0)-(b._idx||0);});
     // Les couleurs sont attribuees dans l'ordre D'AFFICHAGE (zone puis niveau),
     // pas dans l'ordre d'import : deux groupes voisins a l'ecran recoivent ainsi
@@ -14766,7 +14826,7 @@ function deleteLiveZone(freezerId, zoneId){
              +'">'+(en?"assumed":"supposé")+'</span>'):"")
         +(r.leftover!=null?LF("gSubLeft",{v:fmt(r.leftover)}):"");
       h+='<div class="p-grab'+(done?' done':'')+'" data-tog="'+esc(gid)+'"><span class="cbar" style="background:'+c+';position:absolute;left:0;top:50%;transform:translateY(-50%);height:104px;width:5px;border-radius:3px;z-index:2"></span>';
-      h+='<div class="p-gid"><div class="p-gtext"><div class="p-gname">'+esc(capFirst(r.name))+(r.code?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:var(--r-xs);background:'+shade(c,.82)+';color:'+c+';font-family:ui-monospace,SFMono-Regular,monospace">'+esc(r.code)+'</span>':'')+'</div><div class="p-gsub">'+sub+'</div></div></div>';
+      h+='<div class="p-gid"><div class="p-gtext"><div class="p-gname">'+esc(capFirst(r.name))+(r.code?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:var(--r-xs);background:'+shade(c,.82)+';color:'+c+';font-family:ui-monospace,SFMono-Regular,monospace">'+esc(r.code)+'</span>':'')+(r.match==='approche'?' <span class="p-approx" title="'+esc(en?('Name not found as such in CryoMap. Nearest product used: '+(r.invName||'')):('Nom introuvable tel quel dans CryoMap. Produit le plus proche retenu : '+(r.invName||'')))+'">\u2248 '+esc(r.invName||'')+'</span>':'')+'</div><div class="p-gsub">'+sub+'</div></div></div>';
       h+='<div class="p-tubes"><div class="p-tmeta"><div class="n">'
         +'<button class="tb-step" data-tbdec="'+esc(gid)+'" title="'+(en?"one less tube":"un tube de moins")+'">\u2212</button>'
         +'<b class="p-ntube'+(r.tubesManual?' manual':'')+'">'+(nT!=null?nT:'?')+'</b>'

@@ -497,6 +497,77 @@ const SEED = `(() => {
     await page.context().close();
   }
 
+  /* ============ 8 bis. Identification des produits dans la prépa D300e ============
+     L'appariement approché acceptait deux substitutions de caractères pour un
+     nom de 8 caractères et plus : « DAR4 » et « DAR8 » ne diffèrent que d'un
+     caractère, donc demander du DAR8 renvoyait le stock ET L'EMPLACEMENT du
+     DAR4, sous le nom DAR8. Ces cas verrouillent la règle des chiffres. */
+  {
+    const page = await newPage(browser);
+    const essai = async (inventaire, nomFluide) => page.evaluate(async ([inv, fluide]) => {
+      state.freezers = [{ id:'F1', name:'Congélateur', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z_RACK', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      state.reagents = [];
+      inv.forEach((x, b) => { for (let i = 0; i < x.n; i++) state.reagents.push({
+        id: x.nom.replace(/\W/g,'') + i, name: x.nom, type:'Anticorps', lot:'L1', quantity:'30 µL', units:null,
+        loc:{ freezerId:'F1', zoneId:'Z_RACK', boxRow:b, boxCol:0, row:i % 9, col:(i/9)|0 } }); });
+      state.history = []; saveState();
+      view.tab = 'prep'; render();
+      await new Promise(r => setTimeout(r, 300));
+      document.getElementById('p-clear').click();
+      await new Promise(r => setTimeout(r, 200));
+      document.getElementById('p-addfluid').click();
+      const i2 = document.querySelector('#p-fluidBody tr').querySelectorAll('input');
+      i2[0].value = fluide; i2[0].dispatchEvent(new Event('input', { bubbles:true }));
+      i2[1].value = 'mère'; i2[1].dispatchEvent(new Event('input', { bubbles:true }));
+      i2[2].value = '100';  i2[2].dispatchEvent(new Event('input', { bubbles:true }));
+      await new Promise(r => setTimeout(r, 550));
+      const carte = document.querySelector('#p-grab .p-grab');
+      const txt = e => e ? e.textContent.trim() : null;
+      return {
+        stock: carte ? txt(carte.querySelector('.stk')) : null,
+        position: carte ? txt(carte.querySelector('.p-posbig')) : null,
+        approx: carte ? txt(carte.querySelector('.p-approx')) : null,
+        aLocaliser: !!document.querySelector('#p-grab .p-locate'),
+        choix: Array.from(document.querySelectorAll('#p-grab .p-linksel option')).map(o => o.textContent)
+      };
+    }, [inventaire, nomFluide]);
+
+    const DAR4 = { nom:'Deruxtecan isotype DAR4', n:13 };
+    const DAR8 = { nom:'Deruxtecan isotype DAR8', n:25 };
+    const DAR8H = { nom:'Deruxtecan isotype DAR8 hand', n:25 };
+
+    const a = await essai([DAR4, DAR8], 'Deruxtecan isotype DAR8');
+    check('prépa : nom exact ⇒ bon stock et bonne boîte',
+      /25/.test(a.stock || '') && a.position === 'Niv. 5 · Prof. 1' && !a.approx, a);
+
+    const b = await essai([DAR4, DAR8H], 'Deruxtecan isotype DAR8');
+    check('prépa : DAR8 ne se rabat jamais sur DAR4 (chiffres différents)',
+      /25/.test(b.stock || '') && b.position === 'Niv. 5 · Prof. 1', b);
+    check('prépa : un rapprochement approché est signalé à l’écran',
+      /DAR8 hand/.test(b.approx || ''), b);
+
+    const c = await essai([DAR4], 'Deruxtecan isotype DAR8');
+    check('prépa : produit absent ⇒ à localiser, jamais de substitution muette',
+      c.stock === null && c.aLocaliser && c.choix.some(x => /DAR4/.test(x)), c);
+
+    const d = await essai([{ nom:'Docetaxel', n:7 }], 'Docetaxe');
+    check('prépa : une vraie faute de frappe est toujours rattrapée',
+      /7/.test(d.stock || '') && /Docetaxel/.test(d.approx || ''), d);
+
+    const e = await essai([{ nom:'ASP3082', n:4 }, { nom:'ASP4396', n:9 }], 'ASP3082');
+    check('prépa : deux références numérotées proches restent distinctes',
+      /4 /.test((e.stock || '') + ' ') && !/9/.test(e.stock || ''), e);
+
+    // Alias ambigu : deux produits revendiquant « (DAR8) » ne doivent pas
+    // faire pointer « dar8 » vers l'un des deux au hasard.
+    const f = await essai([{ nom:'Isotype A (DAR8)', n:3 }, { nom:'Isotype B (DAR8)', n:8 }], 'DAR8');
+    check('prépa : un alias revendiqué par deux produits est abandonné',
+      f.stock === null && f.aLocaliser, f);
+
+    await page.context().close();
+  }
+
   /* ============ 9. Un deuxième poste rejoint la salle ============ */
   {
     const page = await newPage(browser, true);
