@@ -14123,6 +14123,11 @@ function deleteLiveZone(freezerId, zoneId){
     if(ties>1) return null;                               // ambigu : on ne tranche pas a sa place
     return best;
   }
+  /* Le vocabulaire ne couvre que 85 produits. Pour tout le reste, drugDiluent
+     renvoyait « DMSO » sans le dire : une molecule maison reellement aqueuse
+     se preparait donc dans le mauvais diluant. La valeur par defaut reste,
+     mais drugDiluentKnown() permet de la SIGNALER comme une hypothese. */
+  function drugDiluentKnown(name){ var k=normDrug(name); if(DRUGDIL[k]) return true; var a=DRUGALIAS[k]; return !!(a&&DRUGDIL[a]); }
   function drugDiluent(name){ var k=normDrug(name); if(DRUGDIL[k]) return DRUGDIL[k]; var a=DRUGALIAS[k]; if(a&&DRUGDIL[a]) return DRUGDIL[a]; return "DMSO"; }
   var PKEY="cryomap-prep-run-v2";
   var _n=1; function uidp(){ return "p"+(_n++)+Date.now().toString(36); }
@@ -14486,15 +14491,24 @@ function deleteLiveZone(freezerId, zoneId){
       var key=(lo.zone||"?")+"|"+(lo.niveau||"")+"|"+(lo.prof||"");
       var nk=normDrug(name); var e=byName[nk]; if(!e){ e=byName[nk]={name:name,total:0,spots:{},dil:drugDiluent(name)}; }
       if(r.alias&&!e.alias) e.alias=r.alias; if(r.code&&!e.code) e.code=r.code;
-      e.total += (r.units!=null && r.units>0) ? r.units : 1;   // « aliquotes restantes »
+      // « units » = aliquotes restantes dans cette fiche. null = non suivi, donc
+      // un tube physique. 0 = fiche EPUISEE : elle comptait pourtant pour 1,
+      // ce qui sur-evaluait le stock (4 + 0 + 0 s'affichait « 6 en stock »).
+      var _q = (r.units == null) ? 1 : Math.max(0, Number(r.units) || 0);
+      e.total += _q;
       // Repli de volume par aliquot, tous emplacements confondus : sert quand
       // l'emplacement retenu n'a pas de volume sur sa fiche (sinon on retombait
       // sur les 10 µL supposes alors qu'un autre aliquot du meme produit le porte).
       // Le « if » vivait auparavant sur la ligne du commentaire ci-dessus, donc
       // avale par le // : e.aliqVol n'etait jamais renseigne.
       if(e.aliqVol==null){ var _av=parseAliqVol(r.quantity); if(_av) e.aliqVol=_av; }
-      var sp=e.spots[key]||{key:key,lo:lo,cnt:0,items:[],vol:null}; sp.cnt++;
-      if(sp.vol==null){ var _sv=parseAliqVol(r.quantity); if(_sv) sp.vol=_sv; } sp.items.push({id:r.id,expiry:r.expiry||null,lot:r.lot||null,aliquotDate:r.aliquotDate||null,row:(r.loc&&r.loc.row!=null)?r.loc.row:null,col:(r.loc&&r.loc.col!=null)?r.loc.col:null}); e.spots[key]=sp; });
+      var sp=e.spots[key]||{key:key,lo:lo,cnt:0,items:[],vol:null,volAll:[]}; sp.cnt+=_q;
+      // Volumes differents au meme emplacement : le PREMIER rencontre gagnait,
+      // en silence. On retient le plus PETIT (donc plus de tubes : jamais
+      // sous-prepare) et on garde la liste pour pouvoir le signaler.
+      var _sv=parseAliqVol(r.quantity);
+      if(_sv){ if(sp.volAll.indexOf(_sv)<0) sp.volAll.push(_sv);
+               sp.vol = (sp.vol==null) ? _sv : Math.min(sp.vol, _sv); } sp.items.push({id:r.id,expiry:r.expiry||null,lot:r.lot||null,aliquotDate:r.aliquotDate||null,row:(r.loc&&r.loc.row!=null)?r.loc.row:null,col:(r.loc&&r.loc.col!=null)?r.loc.col:null}); e.spots[key]=sp; });
     var map={}; Object.keys(byName).forEach(function(k){ var e=byName[k]; var best=Object.keys(e.spots).map(function(kk){return e.spots[kk];}).sort(function(a,b){return b.cnt-a.cnt;})[0]; var allSpots=Object.keys(e.spots).map(function(kk){return e.spots[kk];}).sort(function(a,b){return b.cnt-a.cnt;});map[k]={name:e.name,stock:e.total,loc:best?best.lo:null,spots:allSpots,diluent:e.dil,code:e.code||null,alias:e.alias||null,aliqVol:e.aliqVol||null}; });
     /* Alias : nom sans parenthese, jetons entre parentheses, champs Alias et
        Code. Un alias revendique par PLUSIEURS produits ne designe personne :
@@ -14635,12 +14649,16 @@ function deleteLiveZone(freezerId, zoneId){
         if(factor!=null&&factor>=1){ fmap[factor]=(fmap[factor]||0)+load; any=true; if(f.conc!=null) concByFactor[factor]=f.conc; }
         if(f.sol) groupSol=f.sol; if(f.unit) concUnit=f.unit; });
       var _sp0=spotOf(inv); var _av0=(_sp0&&_sp0.vol)?_sp0.vol:(inv&&inv.aliqVol?inv.aliqVol:null);
+      // Plusieurs volumes differents a l'emplacement retenu : le calcul prend le
+      // plus petit, et l'ecart doit se voir.
+      var _volAll=(_sp0&&_sp0.volAll&&_sp0.volAll.length>1)?_sp0.volAll.slice().sort(function(x,y){return x-y;}):null;
       // Nombre de tubes impose par l'operateur : il prime sur le calcul.
       var r=computeTree(fmap, _av0); if(r.empty){ r={empty:true,mother:{used:0,load:0},dils:[],tubes:null,leftover:null,totalDiluent:0,aliquot:null}; }
       r.name=g.name;
       // Surcharge manuelle du nombre de tubes (prime sur le calcul)
       var _ovK=normDrug(g.name||"");
-      var _ovT=prepTubes(); if(_ovT[_ovK]!=null){ r.tubes=_ovT[_ovK]; r.tubesManual=true; } r._idx=g.idx; r.inv=inv; r.match=_match; r.invName=inv?inv.name:null; r.stock=inv?inv.stock:null; r.ambiguous=isAmbiguousSpot(inv); r.loc=inv?spotFor(inv):null; r.spot=spotOf(inv); r.exp=spotExpiryState(r.spot); r.code=inv?inv.code:null; r.diluent=groupSol||(inv?inv.diluent:drugDiluent(g.name)); r.concUnit=concUnit; if(r.nodes) r.nodes.forEach(function(n){ if(concByFactor[n.factor]!=null) n.conc=concByFactor[n.factor]; }); r.missingConc=missingConc; r.hasData=any; results.push(r); });
+      var _ovT=prepTubes(); if(_ovT[_ovK]!=null){ r.tubes=_ovT[_ovK]; r.tubesManual=true; } r._idx=g.idx; r.inv=inv; r.match=_match; r.invName=inv?inv.name:null; r.volMixed=_volAll;
+      r.diluentGuessed = !groupSol && !drugDiluentKnown(inv?inv.name:g.name); r.stock=inv?inv.stock:null; r.ambiguous=isAmbiguousSpot(inv); r.loc=inv?spotFor(inv):null; r.spot=spotOf(inv); r.exp=spotExpiryState(r.spot); r.code=inv?inv.code:null; r.diluent=groupSol||(inv?inv.diluent:drugDiluent(g.name)); r.concUnit=concUnit; if(r.nodes) r.nodes.forEach(function(n){ if(concByFactor[n.factor]!=null) n.conc=concByFactor[n.factor]; }); r.missingConc=missingConc; r.hasData=any; results.push(r); });
     results.sort(function(a,b){return (a._idx||0)-(b._idx||0);});
     // Les couleurs sont attribuees dans l'ordre D'AFFICHAGE (zone puis niveau),
     // pas dans l'ordre d'import : deux groupes voisins a l'ecran recoivent ainsi
@@ -14839,6 +14857,12 @@ function deleteLiveZone(freezerId, zoneId){
       if(l&&l.type==="rack"&&l.niveau&&l.prof) h+='<div class="p-mapslot">'+renderRack(l,c)+'</div>';   // le nom du rack est déjà dans le chemin
       else if(l&&l.type==="compartment") h+='<div class="p-mapslot"><span class="p-compglyph" style="border-color:'+shade(c,.35)+';color:'+c+'">▦</span></div>';
       else h+='<div class="p-mapslot"></div>';
+      if(r.volMixed){
+        h+='<div class="p-expwarn">'
+          +'<div class="p-expwarn-t">'+(en?"Mixed volumes":"Volumes différents")+'</div>'
+          +'<div class="p-expwarn-s">'+r.volMixed.map(function(v){return fmt(v);}).join(' / ')+' µL \u00b7 '
+          +(en?("smallest used: "+fmt(r.volMixed[0])):("retenu : "+fmt(r.volMixed[0])))+' µL</div></div>';
+      }
       if(r.exp && r.exp.state!=='ok' && !r.ambiguous){
         var isExp=(r.exp.state==='expired');
         h+='<div class="p-expwarn'+(isExp?' danger':'')+'">'
@@ -14901,6 +14925,11 @@ function deleteLiveZone(freezerId, zoneId){
       // n'est plus répété ici, il figure déjà sur le tube central.
       h+='<div class="p-recipe">';
       if(r.missingConc) h+='<div class="p-rwarn"><span class="i">!</span><span>'+L("missingConc")+'</span></div>';
+      // Diluant deduit d'une table de 85 produits : pour tout le reste c'etait
+      // « DMSO » en silence. On l'annonce comme une hypothese a verifier.
+      if(r.diluentGuessed) h+='<div class="p-rwarn"><span class="i">?</span><span>'+(curLang()==="en"
+        ? 'Diluent not known for this product — <b>'+esc(dilLabel(r.diluent))+'</b> assumed. Check it before preparing.'
+        : 'Diluant inconnu pour ce produit — <b>'+esc(dilLabel(r.diluent))+'</b> supposé. À vérifier avant de préparer.')+'</span></div>';
       h+='<div class="p-diagram"><div class="p-diagram-steps">';
       // ===== Une ligne par dilution : PRELEVER + AJOUTER = OBTENIR (3 tubes) =====
       var m=r.mother;
@@ -15194,15 +15223,15 @@ function deleteLiveZone(freezerId, zoneId){
         var ac=(a.col==null?-1:a.col), bc=(b.col==null?-1:b.col);
         return bc-ac;
       };
+      // Le retrait NE SORT PAS de l'emplacement retenu. Avant, une fois cet
+      // emplacement epuise, l'app puisait dans les autres boites du meme
+      // produit : l'operateur avait ouvert N6-P1, et CryoMap decrementait
+      // aussi N3-P2, une boite que personne n'avait touchee. L'inventaire
+      // divergeait alors du reel, en silence. Desormais ce qui manque est
+      // signale au lieu d'etre pris ailleurs.
       var pool=[];
       if(r.spot && r.spot.items && r.spot.items.length){
         r.spot.items.slice().sort(byPosDesc).forEach(function(it){ pool.push(it.id); });
-      }
-      if(r.inv && r.inv.spots){
-        r.inv.spots.forEach(function(sp){
-          if(r.spot && sp===r.spot) return;
-          (sp.items||[]).slice().sort(byPosDesc).forEach(function(it){ if(pool.indexOf(it.id)<0) pool.push(it.id); });
-        });
       }
       // 2) consommer : decrementer units, supprimer l'entree quand elle tombe a 0
       for(var p=0; p<pool.length && need>0; p++){
@@ -15216,13 +15245,21 @@ function deleteLiveZone(freezerId, zoneId){
         if(take>=have){ removedIds[id]=1; }
         else { rg.units = have - take; }
       }
-      if(need>0) shortages.push(r.name+" (\u2212"+need+")");
+      if(need>0){
+        var _lo=r.spot&&r.spot.lo;
+        var _where=_lo?[_lo.zone, _lo.niveau!=null?("N"+_lo.niveau):null, _lo.prof!=null?("P"+_lo.prof):null].filter(Boolean).join(" "):"";
+        shortages.push(r.name+" (\u2212"+need+(_where?" \u00b7 "+_where:"")+")");
+      }
     });
     if(Object.keys(removedIds).length){
       state.reagents=state.reagents.filter(function(rg){ return !removedIds[rg.id]; });
     }
     if(shortages.length && typeof toast==="function"){
-      toast((lang==="en"?"Not enough stock for: ":"Stock insuffisant pour : ")+shortages.slice(0,3).join(", "),"warn");
+      toast((lang==="en"
+        ? "Not enough at the chosen location for: "
+        : "Stock insuffisant \u00e0 l\'emplacement retenu pour : ")+shortages.slice(0,3).join(", ")
+        +(lang==="en" ? " \u2014 nothing was taken from another box."
+                      : " \u2014 rien n\'a \u00e9t\u00e9 pris dans une autre bo\u00eete."),"warn",9000);
     }
     if(typeof logAction==="function") logAction("historyPrepValidate",{list:histList,n:total});
     resetPrepRun();

@@ -568,6 +568,97 @@ const SEED = `(() => {
     await page.context().close();
   }
 
+  /* ============ 8 ter. Prépa D300e : plus aucune hypothèse muette ============
+     Même classe de bug que DAR4/DAR8 : l'app déduisait une quantité, un
+     diluant, un volume ou un emplacement sans le dire. */
+  {
+    const page = await newPage(browser);
+    const prep = async (recs, nomFluide, dil) => page.evaluate(async ([rs, fluide, d]) => {
+      state.freezers = [{ id:'F1', name:'Congélateur', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      state.reagents = rs; state.history = []; saveState();
+      view.tab = 'prep'; render(); await new Promise(r => setTimeout(r, 300));
+      document.getElementById('p-clear').click(); await new Promise(r => setTimeout(r, 200));
+      document.getElementById('p-addfluid').click();
+      const i = document.querySelector('#p-fluidBody tr').querySelectorAll('input');
+      i[0].value = fluide; i[0].dispatchEvent(new Event('input', { bubbles:true }));
+      i[1].value = d || 'mère'; i[1].dispatchEvent(new Event('input', { bubbles:true }));
+      i[2].value = '100'; i[2].dispatchEvent(new Event('input', { bubbles:true }));
+      await new Promise(r => setTimeout(r, 600));
+      const c = document.querySelector('#p-grab .p-grab');
+      const T = e => e ? e.textContent.replace(/\s+/g, ' ').trim() : null;
+      return { stock: c && T(c.querySelector('.stk')),
+               sub: c && T(c.querySelector('.p-gsub')),
+               tubes: c && T(c.querySelector('.p-ntube')),
+               dilTube: T(document.querySelector('#p-recipes .p3-tu.dil .p3-tag')),
+               warnsRecette: Array.from(document.querySelectorAll('#p-recipes .p-rwarn')).map(T),
+               warnsCarte: c ? Array.from(c.querySelectorAll('.p-expwarn')).map(T) : [] };
+    }, [recs, nomFluide, dil]);
+
+    const at = (id, nom, q, units, br, bc, col) => ({ id, name:nom, quantity:q, units,
+      loc:{ freezerId:'F1', zoneId:'Z', boxRow:br, boxCol:bc, row:0, col:col||0 } });
+
+    // B. une fiche épuisée (units:0) ne compte plus pour un aliquot
+    const b = await prep([at('a','Paclitaxel','30 µL',4,0,0,0),
+                          at('b','Paclitaxel','30 µL',0,0,0,1),
+                          at('c','Paclitaxel','30 µL',0,0,0,2)], 'Paclitaxel');
+    check('prépa : une fiche épuisée ne gonfle plus le stock',
+      /\b4\b/.test(b.stock || '') && !/\b6\b/.test(b.stock || ''), b);
+
+    // C. volumes différents au même emplacement : le plus petit, et c'est dit
+    const c = await prep([at('v1','Olaparib','200 µL',null,0,0,0),
+                          at('v2','Olaparib','30 µL',null,0,0,1)], 'Olaparib');
+    check('prépa : volumes mélangés ⇒ le plus petit est retenu et signalé',
+      /30 µL/.test(c.sub || '') && c.warnsCarte.some(x => /Volumes différents/.test(x) && /30 \/ 200/.test(x)), c);
+
+    // A. diluant inconnu : la valeur par défaut est annoncée comme hypothèse
+    const a1 = await prep([at('d1','Docetaxel','30 µL',5,0,0,0)], 'Docetaxel', '1:10');
+    const a2 = await prep([at('d2','Cetuximab','30 µL',5,0,0,0)], 'Cetuximab', '1:10');
+    const a3 = await prep([at('d3','Molécule maison XYZ-42','30 µL',5,0,0,0)], 'Molécule maison XYZ-42', '1:10');
+    check('prépa : diluant connu ⇒ pas d’avertissement',
+      a1.dilTube === 'DMSO' && a2.dilTube === 'Tween'
+      && !a1.warnsRecette.some(x => /inconnu/.test(x)) && !a2.warnsRecette.some(x => /inconnu/.test(x)),
+      { a1, a2 });
+    check('prépa : diluant inconnu ⇒ hypothèse annoncée',
+      a3.warnsRecette.some(x => /Diluant inconnu/.test(x) && /DMSO/.test(x)), a3);
+
+    // D. le retrait ne sort jamais de l'emplacement choisi
+    const d = await page.evaluate(async () => {
+      state.freezers = [{ id:'F1', name:'Congélateur', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      state.reagents = [
+        { id:'s1', name:'Gemcitabine', quantity:'30 µL', units:null, loc:{freezerId:'F1',zoneId:'Z',boxRow:0,boxCol:0,row:0,col:0} },
+        { id:'s2', name:'Gemcitabine', quantity:'30 µL', units:null, loc:{freezerId:'F1',zoneId:'Z',boxRow:3,boxCol:1,row:0,col:0} },
+        { id:'s3', name:'Gemcitabine', quantity:'30 µL', units:null, loc:{freezerId:'F1',zoneId:'Z',boxRow:3,boxCol:1,row:0,col:1} }];
+      state.history = []; saveState();
+      view.tab = 'prep'; render(); await new Promise(r => setTimeout(r, 300));
+      document.getElementById('p-clear').click(); await new Promise(r => setTimeout(r, 200));
+      document.getElementById('p-addfluid').click();
+      const i = document.querySelector('#p-fluidBody tr').querySelectorAll('input');
+      i[0].value = 'Gemcitabine'; i[0].dispatchEvent(new Event('input', { bubbles:true }));
+      i[1].value = 'mère'; i[1].dispatchEvent(new Event('input', { bubbles:true }));
+      i[2].value = '2000'; i[2].dispatchEvent(new Event('input', { bubbles:true }));
+      await new Promise(r => setTimeout(r, 600));
+      const sel = document.querySelector('#p-grab .p-spotsel');
+      const opt = sel && Array.from(sel.options).find(o => /N6/.test(o.textContent));
+      if (!sel || !opt) return { erreur: 'sélecteur d’emplacement absent' };
+      sel.value = opt.value; sel.dispatchEvent(new Event('change', { bubbles:true }));
+      await new Promise(r => setTimeout(r, 600));
+      const vb = document.getElementById('p-btnValidate');
+      if (vb) { vb.click(); await new Promise(r => setTimeout(r, 400));
+                const ok = document.getElementById('confirmOk'); if (ok) ok.click(); }
+      await new Promise(r => setTimeout(r, 700));
+      return { restants: state.reagents.map(r => r.id),
+               alerteManque: Array.from(document.querySelectorAll('#toastContainer .toast'))
+                 .some(t => /autre bo/i.test(t.textContent)) };
+    });
+    check('prépa : le retrait ne touche pas une boîte non choisie',
+      JSON.stringify(d.restants) === JSON.stringify(['s2','s3']), d);
+    check('prépa : le manque à l’emplacement retenu est annoncé', d.alerteManque === true, d);
+
+    await page.context().close();
+  }
+
   /* ============ 9. Un deuxième poste rejoint la salle ============ */
   {
     const page = await newPage(browser, true);
