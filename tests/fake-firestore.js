@@ -7,7 +7,10 @@
 (() => {
   const store = new Map();          // "cryomap/salle/reagents/x1" -> { d, by, at }
   const listeners = [];             // { path, cb, seen: Map }
-  const stats = { writes: 0, deletes: 0, batches: 0, reads: 0 };
+  /* docReads compte les DOCUMENTS lus, l'unite reellement facturee par
+     Firestore — `reads` ne compte que les appels. */
+  const stats = { writes: 0, deletes: 0, batches: 0, reads: 0, docReads: 0, colGets: 0 };
+  let served = 0;
   const DELETE = { __delete: true };
 
   const parentOf = p => p.slice(0, p.lastIndexOf('/'));
@@ -35,6 +38,7 @@
       for (const [p, v] of l.seen) if (!now.has(p)) changes.push({ type: 'removed', doc: snapDoc(p, v) });
       l.seen = new Map([...now].map(([p, v]) => [p, JSON.parse(JSON.stringify(v))]));
       if (!changes.length) return;
+      stats.docReads += changes.length;             // ensuite : seulement le delta
       l.cb({
         docChanges: () => changes,
         forEach: fn => now.forEach((v, p) => fn(snapDoc(p, v))),
@@ -61,7 +65,7 @@
       path,
       id: path.slice(path.lastIndexOf('/') + 1),
       collection: name => colRef(path + '/' + name),
-      get: async () => { stats.reads++; return snapDoc(path, store.get(path)); },
+      get: async () => { stats.reads++; stats.docReads++; return snapDoc(path, store.get(path)); },
       set: async (data, opts) => { applyWrite(path, data, !!(opts && opts.merge)); emit(parentOf(path)); },
       delete: async () => { store.delete(path); stats.deletes++; emit(parentOf(path)); }
     };
@@ -71,8 +75,9 @@
       path,
       doc: id => docRef(path + '/' + id),
       get: async () => {
-        stats.reads++;
+        stats.reads++; stats.colGets++;               // lecture d'une collection entiere
         const kids = childrenOf(path);
+        stats.docReads += Math.max(kids.length, 1);   // une requete vide coute 1
         return { forEach: fn => kids.forEach(([p, v]) => fn(snapDoc(p, v))), size: kids.length,
                  docs: kids.map(([p, v]) => snapDoc(p, v)) };
       },
@@ -82,6 +87,8 @@
         setTimeout(() => {                       // premier événement, comme Firestore
           const now = new Map(childrenOf(path));
           l.seen = new Map([...now].map(([p, v]) => [p, JSON.parse(JSON.stringify(v))]));
+          stats.docReads += Math.max(now.size, 1);      // premier payload : tous les documents
+          served++;
           cb({ docChanges: () => [...now].map(([p, v]) => ({ type: 'added', doc: snapDoc(p, v) })),
                forEach: fn => now.forEach((v, p) => fn(snapDoc(p, v))), size: now.size });
         }, 0);
@@ -128,9 +135,11 @@
   /* --- outils pour les tests --- */
   window.__fs = {
     stats,
-    reset: () => { store.clear(); listeners.length = 0; stats.writes = stats.deletes = stats.batches = stats.reads = 0; },
+    reset: () => { store.clear(); listeners.length = 0; stats.writes = stats.deletes = stats.batches = stats.reads = stats.docReads = stats.colGets = 0; },
     dump: () => [...store.entries()].map(([p, v]) => [p, v]),
     paths: () => [...store.keys()],
+    listenerCount: () => listeners.length,
+    snapshotsServed: () => served,
     count: prefix => [...store.keys()].filter(p => p.startsWith(prefix)).length,
     biggestDocBytes: () => Math.max(0, ...[...store.values()].map(v => new Blob([JSON.stringify(v)]).size),
     ),

@@ -11,7 +11,18 @@ const APP_FILE = process.env.APP_FILE || 'CryoMap-prep-d300e.html';
 const APP = 'file://' + path.resolve(__dirname, '..', APP_FILE);
 const FAKE = fs.readFileSync(path.join(__dirname, 'fake-firestore.js'), 'utf8');
 const TDD = fs.readFileSync(path.join(__dirname, 'fixtures', 'run-demo.tdd'), 'utf8');
-const CHROME = process.env.CHROMIUM_PATH || undefined;
+/* Le Chromium du conteneur n'a pas forcement le numero de build attendu par la
+   version de Playwright installee : on le localise au lieu de le supposer. */
+const CHROME = process.env.CHROMIUM_PATH || (() => {
+  const root = '/opt/pw-browsers';
+  try {
+    for (const d of fs.readdirSync(root).filter(n => n.startsWith('chromium-')).sort().reverse()) {
+      const p = path.join(root, d, 'chrome-linux', 'chrome');
+      if (fs.existsSync(p)) return p;
+    }
+  } catch (e) {}
+  return undefined;
+})();
 
 let pass = 0, fail = 0;
 let expectErrors = false;      // levé par les cas qui provoquent une panne exprès
@@ -973,6 +984,216 @@ const SEED = `(() => {
     check('un collègue qui rejoint la salle voit tout',
       r.ok && r.aliquots === 5 && r.congelateur === 'Congélateur A'
       && JSON.stringify(r.stocks) === JSON.stringify([0,1,2,3,4]), r);
+    await page.context().close();
+  }
+
+  /* ---- Cout en lectures Firestore a l'ouverture ----
+     Le quota gratuit est de 50 000 documents lus par jour. L'ancienne sequence
+     (quatre .get() complets PUIS quatre onSnapshot qui relisaient tout) faisait
+     payer deux fois le contenu de la salle a chaque ouverture d'onglet. */
+  {
+    const page = await newPage(browser, true);
+    const r = await page.evaluate(async () => {
+      __fs.reset(); localStorage.clear();
+      __fs.remoteSet('cryomap/equipe', { schema: 2, updatedAt: Date.now() });
+      __fs.remoteSet('cryomap/equipe/meta/freezers', { d: JSON.stringify([{ id:'FA', name:'A', temp:'-80°C', cols:1, rows:1,
+        zones:[{ id:'ZA', name:'Rack', type:'rack', x:0, y:0, w:1, h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }] }]), by:'autre', at: Date.now() });
+      for (let i = 0; i < 20; i++) __fs.remoteSet('cryomap/equipe/reagents/r' + i,
+        { d: JSON.stringify({ name:'Aliquot '+i, units:1, loc:{ freezerId:'FA', zoneId:'ZA', boxRow:0, boxCol:0, row:0, col:i } }), by:'autre', at: Date.now() });
+      const nDocs = __fs.count('cryomap/equipe');
+      __fs.stats.docReads = 0; __fs.stats.colGets = 0;
+      await fbConnect(JSON.stringify({ projectId:'demo', apiKey:'k' }), 'equipe', true);
+      await new Promise(r => setTimeout(r, 1600));
+      return { nDocs, colGets: __fs.stats.colGets, aliquots: state.reagents.length };
+    });
+    // Le premier payload de chaque onSnapshot porte deja toute la collection :
+    // aucune lecture de collection ne doit plus la precede.
+    check('ouvrir l’app ne relit pas les collections en plus des écoutes',
+      r.aliquots === 20 && r.colGets === 0, r);
+    await page.context().close();
+  }
+
+  /* ---- L'ecrasement force laisse un point de retour ---- */
+  {
+    const page = await newPage(browser, true);
+    const r = await page.evaluate(async () => {
+      __fs.reset(); localStorage.clear();
+      __fs.remoteSet('cryomap/equipe', { schema: 2, updatedAt: Date.now() });
+      __fs.remoteSet('cryomap/equipe/meta/freezers', { d: JSON.stringify([{ id:'FA', name:'A', temp:'-80°C', cols:1, rows:1,
+        zones:[{ id:'ZA', name:'Rack', type:'rack', x:0, y:0, w:1, h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }] }]), by:'autre', at: Date.now() });
+      for (let i = 0; i < 20; i++) __fs.remoteSet('cryomap/equipe/reagents/r' + i,
+        { d: JSON.stringify({ name:'Aliquot '+i, units:1, loc:{ freezerId:'FA', zoneId:'ZA', boxRow:0, boxCol:0, row:0, col:i } }), by:'autre', at: Date.now() });
+      await fbConnect(JSON.stringify({ projectId:'demo', apiKey:'k' }), 'equipe', true);
+      await new Promise(r => setTimeout(r, 1200));
+
+      // Ce poste est EN RETARD : il ne connait que 3 aliquots sur les 20.
+      // On modifie l'etat SANS saveState() : sinon la synchro normale
+      // propagerait deja la suppression, et il n'y aurait plus rien a forcer.
+      state.reagents = state.reagents.slice(0, 3);
+      render();
+
+      const p = fbForcePush();
+      await new Promise(r => setTimeout(r, 600));
+      const texte = document.getElementById('confirmBody').textContent.replace(/\s+/g, ' ');
+      document.getElementById('confirmCancel').click();
+      await p;
+      await new Promise(r => setTimeout(r, 300));
+
+      const bk = listAutoBackups().find(b => /avant écrasement|before overwrite/i.test(b.label || ''));
+      let dansLePoint = null;
+      try { dansLePoint = JSON.parse(bk.state).reagents.length; } catch (e) {}
+      return { texte, cloudEncore: __fs.count('cryomap/equipe/reagents'), dansLePoint,
+               local: state.reagents.length };
+    });
+    check('écrasement forcé : la fenêtre chiffre ce qui sera perdu',
+      /20/.test(r.texte) && /\b3\b/.test(r.texte) && /17 aliquot\(s\) seront supprimés/.test(r.texte), r);
+    check('écrasement forcé : annuler ne touche à rien',
+      r.cloudEncore === 20 && r.local === 3, r);
+    check('écrasement forcé : le cloud d’avant est gardé comme point de retour',
+      r.dansLePoint === 20, r);
+    await page.context().close();
+  }
+
+  /* ---- Ctrl+Z survit a un rechargement de l'onglet ---- */
+  {
+    const page = await newPage(browser);
+    await page.evaluate(async () => {
+      localStorage.clear();
+      state.freezers = [{ id:'F1', name:'C', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      state.reagents = [{ id:'a1', name:'Avant', quantity:'30 µL', units:1,
+        loc:{ freezerId:'F1', zoneId:'Z', boxRow:0, boxCol:0, row:0, col:0 } }];
+      state.history = []; saveState(); flushPersist();
+      await new Promise(r => setTimeout(r, 400));
+      pushUndo('Suppression');                   // ecrit aussi le point de retour
+      state.reagents = [];
+      saveState(); flushPersist();
+      await new Promise(r => setTimeout(r, 400));
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof render === 'function' && typeof state === 'object', null, { timeout: 20000 });
+    await page.waitForTimeout(1200);
+    const r = await page.evaluate(async () => {
+      const avant = { pile: undoStack.length, n: state.reagents.length };
+      undo();
+      await new Promise(r => setTimeout(r, 300));
+      return { avant, apres: state.reagents.map(x => x.name) };
+    });
+    check('l’annulation survit au rechargement de l’onglet',
+      r.avant.pile > 0 && r.avant.n === 0 && JSON.stringify(r.apres) === JSON.stringify(['Avant']), r);
+    await page.context().close();
+  }
+
+  /* ---- Un nom rapproche par approximation ne retire pas de stock tout seul ---- */
+  {
+    const page = await newPage(browser);
+    const r = await page.evaluate(async () => {
+      localStorage.clear();
+      state.preferences = state.preferences || {};
+      state.freezers = [{ id:'F1', name:'C', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      state.reagents = [];
+      for (let k = 0; k < 6; k++) state.reagents.push({ id:'d'+k, name:'Docetaxel', quantity:'30 µL',
+        units:null, loc:{ freezerId:'F1', zoneId:'Z', boxRow:0, boxCol:0, row:k, col:0 } });
+      state.history = []; saveState();
+      view.tab = 'prep'; render();
+      await new Promise(r => setTimeout(r, 700));
+      document.getElementById('p-clear').click();
+      await new Promise(r => setTimeout(r, 300));
+      document.getElementById('p-addfluid').click();
+      const i = document.querySelector('#p-fluidBody tr').querySelectorAll('input');
+      // « Docetaxol » : une lettre d'ecart, memes chiffres -> rapprochement approche
+      i[0].value = 'Docetaxol'; i[0].dispatchEvent(new Event('input', { bubbles:true }));
+      i[1].value = 'mère';      i[1].dispatchEvent(new Event('input', { bubbles:true }));
+      i[2].value = '50';        i[2].dispatchEvent(new Event('input', { bubbles:true }));
+      await new Promise(r => setTimeout(r, 800));
+
+      const badge   = !!document.querySelector('#p-grab .p-approx');
+      const bouton  = document.querySelector('#p-grab .p-approx-ok');
+      const btn1    = document.getElementById('p-btnValidate');
+      const bloque  = !!(btn1 && btn1.disabled);
+      const message = (document.querySelector('.p-vbar') || {}).textContent || '';
+
+      if (bouton) bouton.click();
+      await new Promise(r => setTimeout(r, 800));
+      const btn2 = document.getElementById('p-btnValidate');
+      return { badge, bouton: !!bouton, bloque, message: message.replace(/\s+/g,' '),
+               debloque: !!(btn2 && !btn2.disabled),
+               badgeApres: !!document.querySelector('#p-grab .p-approx') };
+    });
+    check('un nom rapproché par approximation bloque la validation',
+      r.badge && r.bouton && r.bloque && /approximation/.test(r.message), r);
+    check('confirmer le rapprochement débloque la validation',
+      r.debloque && r.badgeApres === false, r);
+    await page.context().close();
+  }
+
+  /* ---- La bibliotheque .tdd ne depend plus du seul localStorage ---- */
+  {
+    const page = await newPage(browser);
+    await page.evaluate(async () => {
+      localStorage.clear();
+      window.__prepLibrary.load([{ id:'t1', name:'protocole-A.tdd',
+        fluids:[{ drug:'Docetaxel', dil:'mère', load:2 }], norm:null, savedAt: Date.now() }]);
+      await new Promise(r => setTimeout(r, 600));
+      // Le miroir disparait : quota atteint, ou nettoyage partiel du navigateur.
+      localStorage.removeItem('cryomap-tdd-files-v1');
+      localStorage.removeItem('cryomap-tdd-files-v1-rev');
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof render === 'function' && typeof state === 'object', null, { timeout: 20000 });
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => ({
+      lib: window.__prepLibrary.dump().map(x => x.name),
+      miroirRetabli: localStorage.getItem('cryomap-tdd-files-v1') != null
+    }));
+    check('les protocoles .tdd survivent à la perte du miroir localStorage',
+      JSON.stringify(r.lib) === JSON.stringify(['protocole-A.tdd']) && r.miroirRetabli, r);
+    await page.context().close();
+  }
+
+  /* ---- La bibliotheque .tdd voyage avec la sauvegarde JSON ---- */
+  {
+    const page = await newPage(browser);
+    const r = await page.evaluate(async () => {
+      localStorage.clear();
+      window.__prepLibrary.load([{ id:'t9', name:'protocole-B.tdd',
+        fluids:[{ drug:'Docetaxel', dil:'mère', load:2 }], norm:null, savedAt: Date.now() }]);
+      await new Promise(r => setTimeout(r, 400));
+
+      // Capture du contenu exporte, sans passer par un telechargement reel
+      let blob = null;
+      const vrai = URL.createObjectURL;
+      URL.createObjectURL = b => { blob = b; return vrai.call(URL, b); };
+      const vraiRevoke = URL.revokeObjectURL; URL.revokeObjectURL = () => {};
+      exportData();
+      URL.createObjectURL = vrai; URL.revokeObjectURL = vraiRevoke;
+      const dump = JSON.parse(await blob.text());
+
+      // La bibliotheque est dans l'export mais JAMAIS dans state (donc jamais
+      // dans la synchro d'equipe).
+      const dansState = Object.prototype.hasOwnProperty.call(state, '_prepLibrary');
+
+      // Reimport sur un poste vierge de toute bibliotheque
+      window.__prepLibrary.load([]);
+      localStorage.removeItem('cryomap-tdd-files-v1');
+      localStorage.removeItem('cryomap-tdd-files-v1-rev');
+      if (typeof kvSet === 'function') await kvSet('prep:cryomap-tdd-files-v1', { rev: 0, json: '[]' });
+      const vide = window.__prepLibrary.dump().length;
+
+      const p = importData(new File([JSON.stringify(dump)], 'bk.json', { type:'application/json' }));
+      await new Promise(r => setTimeout(r, 500));
+      document.getElementById('confirmOk').click();
+      await new Promise(r => setTimeout(r, 800));
+
+      return { exporte: (dump._prepLibrary || []).map(x => x.name), dansState, vide,
+               apres: window.__prepLibrary.dump().map(x => x.name),
+               etatPropre: !Object.prototype.hasOwnProperty.call(state, '_prepLibrary') };
+    });
+    check('la bibliothèque .tdd est dans l’export sans polluer l’état synchronisé',
+      JSON.stringify(r.exporte) === JSON.stringify(['protocole-B.tdd']) && r.dansState === false, r);
+    check('réimporter une sauvegarde restaure les protocoles .tdd',
+      r.vide === 0 && JSON.stringify(r.apres) === JSON.stringify(['protocole-B.tdd']) && r.etatPropre, r);
     await page.context().close();
   }
 

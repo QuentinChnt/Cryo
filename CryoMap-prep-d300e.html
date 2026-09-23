@@ -2251,6 +2251,13 @@ header.topbar { background: var(--paper); border-bottom: 1px solid var(--rule-2)
   font-family: var(--mono); font-size:10px; font-weight:700; padding:1px 6px;
   border-radius: var(--r-xs); background: var(--warn-bg); color: var(--warn);
   border:1px solid var(--warn-soft); cursor:help; vertical-align:middle; }
+/* Un rapprochement approche ne doit JAMAIS retirer du stock tout seul :
+   l'operateur confirme d'un clic, et le choix est memorise (PREP_LINK). */
+.p-approx-ok { font-size:10px; font-weight:700; padding:2px 8px; margin-left:2px;
+  border-radius: var(--r-xs); background: var(--warn); color:#fff;
+  border:1px solid var(--warn); cursor:pointer; vertical-align:middle;
+  line-height:1.4; letter-spacing:.02em; }
+.p-approx-ok:hover { filter: brightness(1.08); }
 
 /* Bandeau d'echec d'enregistrement : le seul message permanent de l'app.
    Il reste a l'ecran tant que rien n'est ecrit, contrairement a un toast. */
@@ -8579,12 +8586,14 @@ async function fbInit() {
       await fbPushNow();
     }
 
-    // Lecture initiale complete, puis ecoute temps reel
+    // Amorcage + ecoute temps reel en une seule passe (moitie moins de lectures).
+    // La salle neuve est deja amorcee plus haut : il ne lui reste qu'a ecouter.
     if (!_fb.readDone) {
-      const loaded = await fbLoadAll();
+      const loaded = await fbBootstrap();
       if (!loaded) return;
+    } else {
+      fbListen();
     }
-    fbListen();
     fbSetStatus('synced');
   } catch (e) {
     console.error('[CryoMap] Firebase init error:', e);
@@ -8653,51 +8662,91 @@ async function fbMigrateLegacy(meta) {
   }
 }
 
-/* ---- lecture initiale de toutes les collections ---- */
-async function fbLoadAll() {
-  try {
+/* ---- amorcage : ecoute temps reel ET lecture initiale en une seule passe ----
+   Avant : fbLoadAll() faisait quatre .get() complets, PUIS fbListen() attachait
+   quatre onSnapshot dont chacun refaisait sa propre lecture complete. Chaque
+   ouverture de l'app coutait donc DEUX fois le nombre de documents en lectures
+   Firestore (~5 000 a 2 563 aliquots, pour un quota gratuit de 50 000/jour :
+   dix ouvertures d'onglet suffisaient a l'epuiser, et la synchro s'arretait
+   jusqu'a minuit UTC).
+   Le premier payload d'un onSnapshot porte deja tous les documents : on amorce
+   l'etat avec lui. Cout divise par deux, comportement identique. */
+function fbBootstrap() {
+  return new Promise(resolve => {
     fbSetStatus('syncing');
-    const [rg, iv, hs, mt] = await Promise.all([
-      fbCol('reagents').get(), fbCol('inventory').get(),
-      fbCol('history').get(), fbCol('meta').get()
-    ]);
-    const shadow = fbNewShadow();
-    const reagents = [], inventory = [], history = [];
-    rg.forEach(d => { const v = d.data(); if (!v || typeof v.d !== 'string') return;
-      try { const o = JSON.parse(v.d); o.id = d.id; reagents.push(o); shadow.reagents.set(d.id, v.d); } catch (e) {} });
-    iv.forEach(d => { const v = d.data(); if (!v || typeof v.d !== 'string') return;
-      try { const o = JSON.parse(v.d); o.id = d.id; inventory.push(o); shadow.inventory.set(d.id, v.d); } catch (e) {} });
-    hs.forEach(d => { const v = d.data(); if (!v || typeof v.d !== 'string') return;
-      try { const o = JSON.parse(v.d); o.id = d.id; history.push(o); shadow.history.set(d.id, v.d); } catch (e) {} });
-    const metaDocs = {};
-    mt.forEach(d => { const v = d.data(); if (v && typeof v.d === 'string') { metaDocs[d.id] = v.d; shadow.meta.set(d.id, v.d); } });
+    fbStopListening();
+    const first = { reagents: null, inventory: null, history: null, meta: null };
+    let settled = false;
 
-    _fb.applyingRemote = true;
-    // Le distant fait foi au demarrage, sauf s'il est vide : on ne remplace
-    // jamais des donnees locales par du neant.
-    if (metaDocs.freezers) { try { state.freezers = JSON.parse(metaDocs.freezers); } catch (e) {} }
-    if (metaDocs.preferences) { try { state.preferences = JSON.parse(metaDocs.preferences); } catch (e) {} }
-    if (metaDocs.prep) { try { state.prep = JSON.parse(metaDocs.prep); } catch (e) {} }
-    if (reagents.length || shadow.meta.has('freezers')) state.reagents = reagents;
-    if (inventory.length) state.inventory = inventory;
-    if (history.length) state.history = history.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    migrateState(state);
-    ensureHistoryIds();
-    _reagentIndex = null;
-    _fb.applyingRemote = false;
+    const fail = err => {
+      if (settled) { fbReportAccessError(err); return; }   // erreur en cours de route
+      settled = true; fbStopListening(); fbReportAccessError(err); resolve(false);
+    };
 
-    _fb.shadow = shadow;
-    _fb.initialized = true; _fb.readDone = true;
-    schedulePersist();
-    render();
-    // Ce que ce poste avait en plus part maintenant, sans rien ecraser.
-    fbSchedulePush();
-    return true;
-  } catch (e) {
-    _fb.applyingRemote = false;
-    fbReportAccessError(e);
-    return false;
-  }
+    const finish = () => {
+      settled = true;
+      try {
+        const shadow = fbNewShadow();
+        const reagents = [], inventory = [], history = [];
+        const collect = (sn, list, map) => sn.forEach(d => {
+          const v = d.data(); if (!v || typeof v.d !== 'string') return;
+          map.set(d.id, v.d);
+          try { const o = JSON.parse(v.d); o.id = d.id; list.push(o); } catch (e) {}
+        });
+        collect(first.reagents, reagents, shadow.reagents);
+        collect(first.inventory, inventory, shadow.inventory);
+        collect(first.history, history, shadow.history);
+        const metaDocs = {};
+        first.meta.forEach(d => { const v = d.data();
+          if (v && typeof v.d === 'string') { metaDocs[d.id] = v.d; shadow.meta.set(d.id, v.d); } });
+
+        _fb.applyingRemote = true;
+        // Le distant fait foi au demarrage, sauf s'il est vide : on ne remplace
+        // jamais des donnees locales par du neant.
+        if (metaDocs.freezers) { try { state.freezers = JSON.parse(metaDocs.freezers); } catch (e) {} }
+        if (metaDocs.preferences) { try { state.preferences = JSON.parse(metaDocs.preferences); } catch (e) {} }
+        if (metaDocs.prep) { try { state.prep = JSON.parse(metaDocs.prep); } catch (e) {} }
+        if (reagents.length || shadow.meta.has('freezers')) state.reagents = reagents;
+        if (inventory.length) state.inventory = inventory;
+        if (history.length) state.history = history.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        migrateState(state);
+        ensureHistoryIds();
+        _reagentIndex = null;
+        _fb.applyingRemote = false;
+
+        _fb.shadow = shadow;
+        _fb.initialized = true; _fb.readDone = true;
+        schedulePersist();
+        render();
+        // Ce que ce poste avait en plus part maintenant, sans rien ecraser.
+        fbSchedulePush();
+        resolve(true);
+      } catch (e) {
+        _fb.applyingRemote = false;
+        fbStopListening();
+        fbReportAccessError(e);
+        resolve(false);
+      }
+    };
+
+    /* Une collection peut livrer plusieurs payloads avant que les quatre soient
+       la : on garde le plus recent, qui porte l'etat complet de sa collection.
+       L'ombre est donc batie sur exactement les snapshots consommes, et les
+       docChanges() suivants s'y appliquent sans trou ni doublon. */
+    const arrive = (kind, sn) => {
+      if (settled) { if (kind === 'meta') fbApplyMeta(sn); else fbApplyChanges(kind, sn); return; }
+      first[kind] = sn;
+      if (first.reagents && first.inventory && first.history && first.meta) finish();
+    };
+
+    try {
+      ['reagents', 'inventory', 'history', 'meta'].forEach(kind => {
+        _fb.unsubs.push(fbCol(kind).onSnapshot(
+          sn => arrive(kind, sn),
+          err => { console.error('[CryoMap] snapshot', err); fail(err); }));
+      });
+    } catch (e) { fail(e); }
+  });
 }
 
 /* ---- ecoute temps reel ---- */
@@ -8829,23 +8878,88 @@ async function fbPushNow() {
   }
 }
 
-// RECOVERY: overwrite the cloud with THIS machine's data
+/* RECOVERY : remplacer le cloud par les donnees de CE poste.
+
+   Avant, ce bouton ecrasait la salle en un clic, sans dire ce qui allait
+   disparaitre et sans aucun retour possible. Depuis un poste en retard, il
+   suffisait a effacer le travail de toute l'equipe.
+
+   Les documents distants sont deja lus ici pour batir l'ombre : les memes
+   servent maintenant a (1) afficher ce qui sera reellement perdu et (2) deposer
+   un point de retour dans les sauvegardes automatiques. */
 async function fbForcePush() {
   if (!_fb.db || !_fb.room) { toast(t('syncNotConnected'), 'warn'); return; }
-  const nR = state.reagents ? state.reagents.length : 0;
-  const ok = await customConfirm(t('syncForcePush'), t('syncForcePushConfirm', { nR }), t('syncForcePushBtn'));
-  if (!ok) return;
-  // On repart d'une ombre vide : tout est reecrit, et ce qui n'existe plus
-  // localement est supprime la-bas.
+  const en = lang === 'en';
+  let rg, iv, hs, mt;
   try {
-    const [rg, iv, hs] = await Promise.all([fbCol('reagents').get(), fbCol('inventory').get(), fbCol('history').get()]);
-    const shadow = fbNewShadow();
-    rg.forEach(d => shadow.reagents.set(d.id, '\u0000'));
-    iv.forEach(d => shadow.inventory.set(d.id, '\u0000'));
-    hs.forEach(d => shadow.history.set(d.id, '\u0000'));
+    [rg, iv, hs, mt] = await Promise.all([fbCol('reagents').get(), fbCol('inventory').get(),
+                                          fbCol('history').get(), fbCol('meta').get()]);
+  } catch (e) { fbReportAccessError(e); return; }
+
+  // Ombre « tout est different » : ce qui n'existe plus ici sera supprime la-bas.
+  const shadow = fbNewShadow();
+  const cloudReagents = [], cloudInventory = [];
+  rg.forEach(d => {
+    shadow.reagents.set(d.id, '\u0000');
+    const v = d.data(); if (!v || typeof v.d !== 'string') return;
+    try { const o = JSON.parse(v.d); o.id = d.id; cloudReagents.push(o); } catch (e) {}
+  });
+  iv.forEach(d => {
+    shadow.inventory.set(d.id, '\u0000');
+    const v = d.data(); if (!v || typeof v.d !== 'string') return;
+    try { const o = JSON.parse(v.d); o.id = d.id; cloudInventory.push(o); } catch (e) {}
+  });
+  hs.forEach(d => shadow.history.set(d.id, '\u0000'));
+  let cloudFreezers = [];
+  mt.forEach(d => {
+    if (d.id !== 'freezers') return;
+    const v = d.data(); if (!v || typeof v.d !== 'string') return;
+    try { const p = JSON.parse(v.d); if (Array.isArray(p)) cloudFreezers = p; } catch (e) {}
+  });
+
+  const nCloud = cloudReagents.length, nLocal = (state.reagents || []).length;
+
+  // Point de retour, restaurable depuis « Restaurer une sauvegarde ».
+  let saved = false;
+  if (nCloud) {
+    try {
+      await loadAutoBackups();
+      autoBackupFrom(JSON.stringify({ freezers: cloudFreezers, reagents: cloudReagents, inventory: cloudInventory }),
+        en ? 'Cloud before overwrite' : 'Cloud avant écrasement');
+      saved = true;
+    } catch (e) { saved = false; }
+  }
+
+  // Le chiffre qui compte n'est pas ce qu'on envoie : c'est ce qu'on efface.
+  const perte = nCloud - nLocal;
+  let body = '<div style="font-size:13px;line-height:1.55">'
+    + (en ? 'Cloud right now: <b>' + nCloud + '</b> aliquot(s).<br>This machine: <b>' + nLocal + '</b> aliquot(s).'
+          : 'Cloud actuellement : <b>' + nCloud + '</b> aliquot(s).<br>Ce poste : <b>' + nLocal + '</b> aliquot(s).')
+    + '</div>';
+  if (perte > 0) {
+    body += '<div style="margin-top:10px;padding:10px 12px;border-radius:var(--r-sm);'
+      + 'background:rgba(220,38,38,.10);border:1px solid rgba(220,38,38,.35);font-size:13px;line-height:1.5"><b>'
+      + (en ? perte + ' aliquot(s) will be deleted for the whole team.'
+            : perte + ' aliquot(s) seront supprimés pour toute l\'équipe.')
+      + '</b><br>'
+      + (en ? 'This machine holds fewer than the cloud — make sure it is the one with the right data.'
+            : 'Ce poste en a moins que le cloud — vérifie que c\'est bien lui qui détient les bonnes données.')
+      + '</div>';
+  }
+  body += '<div style="margin-top:10px;font-size:12px;opacity:.85">'
+    + (saved ? (en ? '↩ A restore point of the current cloud has been saved on this machine (“Restore a backup”).'
+                   : '↩ Un point de retour du cloud actuel a été enregistré sur ce poste (« Restaurer une sauvegarde »).')
+             : (nCloud ? (en ? '⚠ The restore point could not be saved.'
+                             : '⚠ Le point de retour n\'a pas pu être enregistré.')
+                       : (en ? 'The cloud is empty: nothing to lose.'
+                             : 'Le cloud est vide : rien à perdre.')))
+    + '</div>';
+
+  const ok = await customConfirm(t('syncForcePush'), body, t('syncForcePushBtn'), true);
+  if (!ok) return;
+  try {
     _fb.shadow = shadow;
-    await fbPushNow();
-    toast(t('syncForcePushDone'), 'success');
+    if (await fbPushNow()) toast(t('syncForcePushDone'), 'success');
   } catch (e) { fbReportAccessError(e); }
 }
 
@@ -8855,8 +8969,8 @@ async function fbForcePull() {
   const ok = await customConfirm(t('syncForcePull'), t('syncForcePullConfirm'), t('syncForcePullBtn'));
   if (!ok) return;
   _fb.readDone = false;
-  const loaded = await fbLoadAll();
-  if (loaded) { fbListen(); toast(t('syncForcePullDone'), 'success'); }
+  const loaded = await fbBootstrap();   // rattache aussi les ecoutes
+  if (loaded) toast(t('syncForcePullDone'), 'success');
 }
 
 async function fbConnect(configText, room, useAnon) {
@@ -9090,6 +9204,26 @@ function undo() {
 function refreshUndoButton() {
   const btn = document.getElementById('btnUndo');
   if (btn) btn.disabled = undoStack.length === 0;
+}
+
+/* La pile d'annulation ne vivait qu'en memoire : un rechargement de l'onglet,
+   une fermeture accidentelle ou un plantage la vidaient — alors que les points
+   de retour correspondants etaient deja ecrits dans IndexedDB par pushUndo.
+   On la reamorce avec eux au demarrage : Ctrl+Z redevient utilisable apres un
+   rechargement, sans un octet de stockage supplementaire (les chaines sont
+   partagees avec les sauvegardes automatiques). */
+function seedUndoFromBackups() {
+  if (undoStack.length) return;
+  const list = listAutoBackups();
+  if (!list.length) return;
+  // Les sauvegardes vont du plus recent au plus ancien ; la pile, l'inverse.
+  undoStack = list.slice(0, UNDO_MAX).reverse().map(b => ({
+    json: b.state,
+    label: b.label || (lang === 'en' ? 'previous action' : 'action précédente'),
+    ts: Date.parse(b.at) || 0,
+    prep: null                      // la prepa n'est pas dans les sauvegardes
+  }));
+  refreshUndoButton();
 }
 
 
@@ -13861,7 +13995,12 @@ function navigateFromSearch(el) {
 /* IMPORT / EXPORT */
 function exportData() {
   flushPersist();                       // l'export doit refléter l'état enregistré
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  // La bibliotheque .tdd voyage avec la sauvegarde, sans jamais entrer dans
+  // `state` : elle est locale au poste et n'a rien a faire dans Firestore.
+  const payload = Object.assign({}, state);
+  try { const lib = window.__prepLibrary && window.__prepLibrary.dump();
+        if (lib && lib.length) payload._prepLibrary = lib; } catch (e) {}
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -13926,6 +14065,9 @@ function importData(file) {
       const ok = await customConfirm(t('importTitle'), t('importText', {nF: data.freezers.length, nR: data.reagents.length}), t('importBtn'));
       if (!ok) return;
       pushUndo(t('historyImport', {nF: data.freezers.length, nR: data.reagents.length, sF: data.freezers.length>1?'s':'', sR: data.reagents.length>1?'s':''}));
+      // Extraite AVANT l'affectation : elle ne doit pas se retrouver dans state,
+      // donc pas davantage dans la synchro d'equipe.
+      const lib = data._prepLibrary; delete data._prepLibrary;
       // Preserve history and preferences across import
       const prevHistory = state.history || [];
       const prevPrefs = state.preferences || { colorByType: false, initials: '' };
@@ -13936,7 +14078,11 @@ function importData(file) {
       logAction('historyImport', {nF: data.freezers.length, nR: data.reagents.length, sF: data.freezers.length>1?'s':'', sR: data.reagents.length>1?'s':''});
       saveState();
       view = { tab: 'map', level: 'overview', freezerId: state.freezers[0]?.id, zoneId: null, boxRow: null, boxCol: null, selectedReagentId: null, compBoxId: null, filter: { owner: null, type: null, expiringOnly: false, half: null }, selectMode: false, selectedIds: new Set(), pendingBulkMove: null, selectedBoxes: new Set(), reorganizeMode: false, repositionMode: false, boxSelectMode: false };
+      let nLib = 0;
+      try { if (lib && window.__prepLibrary) nLib = window.__prepLibrary.load(lib); } catch (e) {}
       toast(t('toastImport'), 'success');
+      if (nLib) toast(lang === 'en' ? nLib + ' .tdd protocol(s) restored'
+                                    : nLib + ' protocole(s) .tdd restauré(s)', 'success');
       render();
     } catch (err) { toast(t('toastImportErr', {msg: err.message}), 'danger'); }
   };
@@ -14059,7 +14205,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('beforeunload', flushPersist);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPersist(); });
 
-  loadAutoBackups().then(() => adoptNewerPersistedState()).catch(() => {});
+  loadAutoBackups().then(() => { adoptNewerPersistedState(); seedUndoFromBackups(); }).catch(() => {});
 
   document.querySelectorAll('[data-close-modal]').forEach(el => el.onclick = () => document.getElementById(el.dataset.closeModal).classList.remove('show'));
   document.querySelectorAll('.modal-backdrop').forEach(el => {
@@ -14250,22 +14396,22 @@ function deleteLiveZone(freezerId, zoneId){
        - en cas de candidats a egalite, on ne devine pas : le produit est
          declare absent, et l'operateur l'associe lui-meme (le choix est
          memorise, et la validation du run reste bloquee entre-temps). */
-  function fuzzyInv(k, im){
+  function fuzzyInvKey(k, im){
     if(!k) return null;
-    if(im[k]) return im[k];
+    if(im[k]) return k;
     var kd = digitsOf(k);
-    var best=null, bestScore=1e9, bestKey=null, ties=0;
+    var bestScore=1e9, bestKey=null, ties=0;
     Object.keys(im).forEach(function(kk){
       if(digitsOf(kk) !== kd) return;                     // chiffres differents -> jamais le meme produit
       var minL=Math.min(k.length,kk.length), maxL=Math.max(k.length,kk.length), d=lev(k,kk), score=null;
       if((minL>=8&&d<=2)||(minL>=5&&d<=1)) score=10+d;
       else if(minL>=5 && (kk.indexOf(k)>=0||k.indexOf(kk)>=0) && (maxL-minL)<=maxL*0.6) score=20+(maxL-minL);
       if(score==null) return;
-      if(score<bestScore){ bestScore=score; best=im[kk]; bestKey=kk; ties=1; }
+      if(score<bestScore){ bestScore=score; bestKey=kk; ties=1; }
       else if(score===bestScore && kk!==bestKey){ ties++; }
     });
     if(ties>1) return null;                               // ambigu : on ne tranche pas a sa place
-    return best;
+    return bestKey;
   }
   /* Le vocabulaire ne couvre que 85 produits. Pour tout le reste, drugDiluent
      renvoyait « DMSO » sans le dire : une molecule maison reellement aqueuse
@@ -14274,6 +14420,44 @@ function deleteLiveZone(freezerId, zoneId){
   function drugDiluentKnown(name){ var k=normDrug(name); if(DRUGDIL[k]) return true; var a=DRUGALIAS[k]; return !!(a&&DRUGDIL[a]); }
   function drugDiluent(name){ var k=normDrug(name); if(DRUGDIL[k]) return DRUGDIL[k]; var a=DRUGALIAS[k]; if(a&&DRUGDIL[a]) return DRUGDIL[a]; return "DMSO"; }
   var PKEY="cryomap-prep-run-v2";
+
+  /* ---- Stockage de la prepa : IndexedDB en magasin de reference, localStorage
+     en miroir synchrone.
+
+     Les protocoles .tdd memorises et le run en cours ne vivaient QUE dans
+     localStorage. Son quota (~5 Mo, partage avec l'inventaire complet qui pese
+     deja pres d'un Mo) pouvait refuser l'ecriture en silence : la bibliotheque
+     de protocoles disparaissait sans un mot, et le run en cours avec elle.
+     IndexedDB n'a pas ce plafond et devient le magasin de reference. Le miroir
+     reste ecrit parce qu'il se lit de facon SYNCHRONE au demarrage : l'onglet
+     Prepa s'affiche sans attendre une promesse. ---- */
+  function prepStoreWrite(key, obj){
+    var json; try{ json=JSON.stringify(obj); }catch(e){ return false; }
+    var rev=Date.now(), mirrorOk=false;
+    try{ localStorage.setItem(key, json); localStorage.setItem(key+"-rev", String(rev)); mirrorOk=true; }
+    catch(e){ /* quota : IndexedDB prend le relais, la revision du miroir reste en arriere */ }
+    if(typeof kvSet==="function") kvSet("prep:"+key, {rev:rev, json:json}).catch(function(){});
+    return mirrorOk;
+  }
+  function prepStoreReadSync(key){
+    try{ var raw=localStorage.getItem(key); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+  }
+  /* Reprise asynchrone : si IndexedDB porte une version plus recente que le
+     miroir (miroir sature, ou vide), on l'adopte. `apply` ne recoit la valeur
+     que dans ce cas. */
+  function prepStoreAdopt(key, apply){
+    if(typeof kvGet!=="function") return;
+    kvGet("prep:"+key).then(function(rec){
+      if(!rec || typeof rec.json!=="string") return;
+      var mirrorRev=0, mirrorHas=false;
+      try{ mirrorRev=Number(localStorage.getItem(key+"-rev"))||0;
+           mirrorHas=localStorage.getItem(key)!=null; }catch(e){}
+      if(mirrorHas && mirrorRev>=(rec.rev||0)) return;     // le miroir est a jour
+      var parsed; try{ parsed=JSON.parse(rec.json); }catch(e){ return; }
+      try{ localStorage.setItem(key, rec.json); localStorage.setItem(key+"-rev", String(rec.rev||0)); }catch(e){}
+      try{ apply(parsed); }catch(e){}
+    }).catch(function(){});
+  }
   var _n=1; function uidp(){ return "p"+(_n++)+Date.now().toString(36); }
 
   /* ---- i18n interne (lit la variable globale lang de CryoMap) ---- */
@@ -14363,15 +14547,14 @@ function deleteLiveZone(freezerId, zoneId){
   function loadPrep(){
     // Les protocoles .tdd importés sont conservés d'une session à l'autre
     // (avec leurs réglages) ; « Vider » remet tout à zéro.
-    try{ var raw=localStorage.getItem(PKEY); if(raw) return applyPrepFields(JSON.parse(raw)); }catch(e){}
-    return applyPrepFields(null);
+    return applyPrepFields(prepStoreReadSync(PKEY));
   }
 
   function prepSnapshot(){ return {plates:prep.plates,mode:prep.mode,excess:prep.excess,minPrep:prep.minPrep,maxPrep:prep.maxPrep,minPip:prep.minPip,load:prep.load,tubesOv:prep.tubesOv||{},norm:prep.norm,sources:prep.sources||[],
     checks:prep.checks||{}, excluded:prep.excluded||{}, allowExpired:!!prep.allowExpired,
     spotChoice:(typeof PREP_SPOT!=="undefined"&&PREP_SPOT)||{}, linkChoice:(typeof PREP_LINK!=="undefined"&&PREP_LINK)||{},
     fluids:prep.fluids.map(function(f){return {drug:f.drug,dil:f.dil,load:f.load,sol:f.sol,conc:f.conc,unit:f.unit,src:f.src||null,srcId:f.srcId||null};})}; }
-  function savePrep(){ try{ localStorage.setItem(PKEY, JSON.stringify(prepSnapshot())); }catch(e){} }
+  function savePrep(){ prepStoreWrite(PKEY, prepSnapshot()); }
   // Partage équipe : écrit la prépa dans l'état synchronisé (Firebase)
   function sharePrep(){
     try{
@@ -14750,8 +14933,8 @@ function deleteLiveZone(freezerId, zoneId){
 
   // ---- Memoire des .tdd : chaque fichier importe est retenu (local au poste) ----
   var TDDFILES_KEY="cryomap-tdd-files-v1";
-  function tddFiles(){ try{ var a=JSON.parse(localStorage.getItem(TDDFILES_KEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
-  function saveTddFiles(a){ try{ localStorage.setItem(TDDFILES_KEY, JSON.stringify(a)); return true; }catch(e){ return false; } }
+  function tddFiles(){ var a=prepStoreReadSync(TDDFILES_KEY); return Array.isArray(a)?a:[]; }
+  function saveTddFiles(a){ return prepStoreWrite(TDDFILES_KEY, a); }
   function cleanFluid(f){ return {drug:f.drug,dil:f.dil,load:f.load,conc:f.conc,unit:f.unit,sol:f.sol,code:f.code}; }
   // Meme nom => mise a jour (reimporter un .tdd corrige remplace l'ancien)
   function rememberTdd(name, fluids, norm){
@@ -14920,6 +15103,29 @@ function deleteLiveZone(freezerId, zoneId){
   // loadPrep les met de cote dans prep._spotChoice / _linkChoice, on les reprend ici.
   if(prep._spotChoice){ for(var _sk in prep._spotChoice) PREP_SPOT[_sk]=prep._spotChoice[_sk]; delete prep._spotChoice; }
   if(prep._linkChoice){ for(var _lk in prep._linkChoice) PREP_LINK[_lk]=prep._linkChoice[_lk]; delete prep._linkChoice; }
+
+  /* Le miroir localStorage peut etre en retard (quota atteint la derniere fois)
+     ou vide : on regarde IndexedDB, et on reprend ce qui y est plus recent. */
+  var _prepAdopted=false;
+  function prepStoreAdoptOnce(){
+    if(_prepAdopted) return; _prepAdopted=true;
+    // Bibliotheque .tdd : tddFiles() relit le stockage a chaque appel, un
+    // rafraichissement suffit.
+    prepStoreAdopt(TDDFILES_KEY, function(){
+      try{ if(typeof view!=="undefined" && view.tab==="prep") renderPrepTab(document.getElementById("canvas")); }catch(e){}
+    });
+    // Run en cours : repris SEULEMENT si rien n'a ete saisi entre-temps. Une
+    // version de secours ne doit jamais ecraser un travail en cours.
+    prepStoreAdopt(PKEY, function(sn){
+      if(prep.fluids.length || (prep.sources && prep.sources.length)) return;
+      var d=applyPrepFields(sn);
+      for(var kk in d) prep[kk]=d[kk];
+      if(prep._spotChoice){ for(var a1 in prep._spotChoice) PREP_SPOT[a1]=prep._spotChoice[a1]; delete prep._spotChoice; }
+      if(prep._linkChoice){ for(var a2 in prep._linkChoice) PREP_LINK[a2]=prep._linkChoice[a2]; delete prep._linkChoice; }
+      try{ if(typeof view!=="undefined" && view.tab==="prep"){ refillFluids(); renderResults(); renderPrepTab(document.getElementById("canvas")); } }catch(e){}
+    });
+  }
+  prepStoreAdoptOnce();
   // Les surcharges de tubes vivent dans prep.tubesOv : une variable separee
   // declaree apres loadPrep() aurait ecrase les valeurs restaurees.
   function prepTubes(){ if(!prep.tubesOv) prep.tubesOv={}; return prep.tubesOv; }
@@ -15033,7 +15239,8 @@ function deleteLiveZone(freezerId, zoneId){
     var plates=Math.max(1,Number(prep.plates)||1); var im=liveInventory(); var groups={};
     prep.fluids.forEach(function(f,i){ var name=(f.drug||"").trim(); if(!name) return; var key=normDrug(name); if(!groups[key]) groups[key]={name:name,items:[],idx:i}; groups[key].items.push(f); });
     var results=[]; Object.keys(groups).forEach(function(k){ var g=groups[k]; var _linked=(PREP_LINK[k]&&im[PREP_LINK[k]])||null, _exact=im[k]||null;
-      var inv=_linked||_exact||fuzzyInv(k,im)||null;
+      var _fzKey=(!_linked&&!_exact)?fuzzyInvKey(k,im):null;
+      var inv=_linked||_exact||(_fzKey?im[_fzKey]:null)||null;
       // Comment le produit a-t-il ete identifie ? Un rapprochement approche
       // doit se VOIR : c'est le silence qui rendait la confusion dangereuse.
       var _match=_linked?'manuel':(_exact?'exact':(inv?'approche':'absent')); var fmap={}; var missingConc=false, any=false; var groupSol=null, concByFactor={}, concUnit=null;
@@ -15051,6 +15258,7 @@ function deleteLiveZone(freezerId, zoneId){
       // Surcharge manuelle du nombre de tubes (prime sur le calcul)
       var _ovK=normDrug(g.name||"");
       var _ovT=prepTubes(); if(_ovT[_ovK]!=null){ r.tubes=_ovT[_ovK]; r.tubesManual=true; } r._idx=g.idx; r.inv=inv; r.match=_match; r.invName=inv?inv.name:null; r.volMixed=_volAll;
+      r.groupKey=k; r.approxKey=_fzKey;   // de quoi confirmer l'appariement en un clic
       r.diluentGuessed = !groupSol && !drugDiluentKnown(inv?inv.name:g.name); r.stock=inv?inv.stock:null; r.ambiguous=isAmbiguousSpot(inv); r.loc=inv?spotFor(inv):null; r.spot=spotOf(inv); r.exp=spotExpiryState(r.spot); r.code=inv?inv.code:null; r.diluent=groupSol||(inv?inv.diluent:drugDiluent(g.name)); r.concUnit=concUnit; if(r.nodes) r.nodes.forEach(function(n){ if(concByFactor[n.factor]!=null) n.conc=concByFactor[n.factor]; }); r.missingConc=missingConc; r.hasData=any; results.push(r); });
     results.sort(function(a,b){return (a._idx||0)-(b._idx||0);});
     // Les couleurs sont attribuees dans l'ordre D'AFFICHAGE (zone puis niveau),
@@ -15117,6 +15325,28 @@ function deleteLiveZone(freezerId, zoneId){
              : (amb.length+' réactif'+(amb.length>1?'s':'')+' présent'+(amb.length>1?'s':'')+' à plusieurs emplacements'))
         + '</b> — ' + (en?'select where to pull each one from before validating.'
                         :'choisis d\'où le sortir avant de valider.')
+        + '</div><button class="p-vbtn" id="p-btnValidate" disabled>'+L("vbBtn")+'</button></div>';
+    }
+    /* Appariement approche : le produit du .tdd n'existe pas tel quel dans
+       CryoMap, un voisin a ete propose. Tant que l'operateur ne l'a pas
+       confirme, valider le run retirerait du stock sur un produit DEVINE — et
+       enverrait chercher la mauvaise boite. Le badge « ≈ » le montrait deja,
+       mais montrer ne suffit pas : on bloque, et le bouton « Confirmer » a cote
+       du nom leve le blocage en memorisant l'association. */
+    var appr=vv.filter(function(r){
+      if(prep.excluded[(r.name||"").trim().toLowerCase()]) return false;   // pas dans le run
+      return r.match==='approche';
+    });
+    if(appr.length){
+      return '<div class="p-vbar p-vbar-block"><div class="vb-txt"><b>'
+        + (en? (appr.length+' name'+(appr.length>1?'s':'')+' matched approximately')
+             : (appr.length+' nom'+(appr.length>1?'s':'')+' rapproché'+(appr.length>1?'s':'')+' par approximation'))
+        + '</b> — ' + appr.map(function(r){
+              return esc(capFirst(r.name))+' \u2248 '+esc(r.invName||'');
+            }).slice(0,3).join(', ')
+        + (appr.length>3?' \u2026':'')
+        + ' · ' + (en?'confirm each one above before validating.'
+                    :'confirme chacun ci-dessus avant de valider.')
         + '</div><button class="p-vbtn" id="p-btnValidate" disabled>'+L("vbBtn")+'</button></div>';
     }
     // Les drogues cochées « j'ai déjà » sont exclues du run : elles ne doivent
@@ -15249,7 +15479,7 @@ function deleteLiveZone(freezerId, zoneId){
         sub+=' <span class="p-redil-badge" data-redil="'+esc(r.name)+'" title="'+esc(_rtitle)+'">⚗ '+(en?"redilute":"rediluer")+(r.redil.batches>1?(' ×'+r.redil.batches):'')+'</span>';
       }
       h+='<div class="p-grab'+(done?' done':'')+'" data-tog="'+esc(gid)+'"><span class="cbar" style="background:'+c+';position:absolute;left:0;top:50%;transform:translateY(-50%);height:104px;width:5px;border-radius:3px;z-index:2"></span>';
-      h+='<div class="p-gid"><div class="p-gtext"><div class="p-gname">'+esc(capFirst(r.name))+(r.code?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:var(--r-xs);background:'+shade(c,.82)+';color:'+c+';font-family:ui-monospace,SFMono-Regular,monospace">'+esc(r.code)+'</span>':'')+(r.match==='approche'?' <span class="p-approx" title="'+esc(en?('Name not found as such in CryoMap. Nearest product used: '+(r.invName||'')):('Nom introuvable tel quel dans CryoMap. Produit le plus proche retenu : '+(r.invName||'')))+'">\u2248 '+esc(r.invName||'')+'</span>':'')+'</div><div class="p-gsub">'+sub+'</div></div></div>';
+      h+='<div class="p-gid"><div class="p-gtext"><div class="p-gname">'+esc(capFirst(r.name))+(r.code?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:var(--r-xs);background:'+shade(c,.82)+';color:'+c+';font-family:ui-monospace,SFMono-Regular,monospace">'+esc(r.code)+'</span>':'')+(r.match==='approche'?' <span class="p-approx" title="'+esc(en?('Name not found as such in CryoMap. Nearest product proposed: '+(r.invName||'')):('Nom introuvable tel quel dans CryoMap. Produit le plus proche proposé : '+(r.invName||'')))+'">\u2248 '+esc(r.invName||'')+'</span> <button type="button" class="p-approx-ok" data-linkok="'+esc(r.groupKey||'')+'" data-linkval="'+esc(r.approxKey||'')+'" title="'+esc(en?('Confirm that "'+(r.name||'')+'" is indeed "'+(r.invName||'')+'"'):('Confirmer que « '+(r.name||'')+' » est bien « '+(r.invName||'')+' »'))+'">'+(en?'Confirm':'Confirmer')+'</button>':'')+'</div><div class="p-gsub">'+sub+'</div></div></div>';
       h+='<div class="p-tubes"><div class="p-tmeta"><div class="n">'
         +'<button class="tb-step" data-tbdec="'+esc(gid)+'" title="'+(en?"one less tube":"un tube de moins")+'">\u2212</button>'
         +'<b class="p-ntube'+(r.tubesManual?' manual':'')+'">'+(nT!=null?nT:'?')+'</b>'
@@ -15494,6 +15724,15 @@ function deleteLiveZone(freezerId, zoneId){
         b.addEventListener("click", function(e){ e.stopPropagation();
           delete prepTubes()[tubeKeyOf(b.getAttribute("data-tbrst"))];
           savePrep(); renderResults(); });
+      });
+      gb.querySelectorAll(".p-approx-ok").forEach(function(btn){
+        btn.addEventListener("click", function(e){ e.stopPropagation();
+          var kk=btn.getAttribute("data-linkok"), vv=btn.getAttribute("data-linkval");
+          if(!kk||!vv) return;
+          PREP_LINK[kk]=vv;        // le rapprochement devient une association explicite
+          savePrep();              // et survit au rechargement
+          renderResults();
+        });
       });
       gb.querySelectorAll(".p-linksel").forEach(function(sel){
         sel.addEventListener("click",function(e){ e.stopPropagation(); });
@@ -15862,6 +16101,14 @@ function deleteLiveZone(freezerId, zoneId){
     }catch(e){}
   };
   window.renderPrepTab=renderPrepTab;
+  /* La bibliotheque de protocoles est locale au poste. Sans elle dans l'export,
+     changer de machine (ou repartir d'une sauvegarde) faisait perdre tous les
+     .tdd memorises, sans aucun message. */
+  window.__prepLibrary={
+    dump:function(){ try{ return tddFiles(); }catch(e){ return []; } },
+    load:function(a){ if(!Array.isArray(a)||!a.length) return 0;
+      try{ saveTddFiles(a.slice(0,40)); return Math.min(a.length,40); }catch(e){ return 0; } }
+  };
   window.__clearPrep=function(){ if(!prep.fluids.length && !prep.norm) return; resetPrepRun(); if(typeof view!=="undefined" && view.tab==="prep"){ if(typeof refillFluids==="function") refillFluids(); if(typeof renderResults==="function") renderResults(); } };
   var tp=document.getElementById("tabPrep"); if(tp) tp.onclick=function(){ if(view.tab!=="prep"){ view.tab="prep"; render(); } };
 })();
