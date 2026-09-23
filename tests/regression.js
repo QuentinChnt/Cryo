@@ -5,7 +5,10 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 
-const APP = 'file://' + path.resolve(__dirname, '..', 'CryoMap-prep-d300e.html');
+// APP_FILE permet de faire tourner la meme suite sur un autre fichier
+// (ex. une variante livree par l'utilisateur) sans toucher au harnais.
+const APP_FILE = process.env.APP_FILE || 'CryoMap-prep-d300e.html';
+const APP = 'file://' + path.resolve(__dirname, '..', APP_FILE);
 const FAKE = fs.readFileSync(path.join(__dirname, 'fake-firestore.js'), 'utf8');
 const TDD = fs.readFileSync(path.join(__dirname, 'fixtures', 'run-demo.tdd'), 'utf8');
 const CHROME = process.env.CHROMIUM_PATH || undefined;
@@ -766,7 +769,7 @@ const SEED = `(() => {
       const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
       return {
         note: T(document.getElementById('p-parsenote')),
-        pastilles: Array.from(document.querySelectorAll('.p-src')).map(T),
+        pastilles: Array.from(document.querySelectorAll('#p-runsrcs .prs-name')).map(T),
         charges: Array.from(document.querySelectorAll('#p-fluidBody tr'))
           .map(tr => parseFloat(tr.querySelectorAll('input')[2].value)),
         vehicules: Array.from(document.querySelectorAll('.p-grab-veh'))
@@ -784,8 +787,9 @@ const SEED = `(() => {
     check('.tdd : les 8 produits sont appariés exactement, rien à localiser',
       imp.cartes.length === 8 && imp.cartes.every(c => c[1] === null) && imp.aLocaliser === 0, imp.cartes);
     check('.tdd : le compte-rendu d’import reste affiché', /8 fluides/.test(imp.note || ''), imp.note);
+    // le nom affiché est débarrassé de son extension
     check('.tdd : le protocole importé est étiqueté (donc retirable)',
-      imp.pastilles.length === 1 && /run-demo\.tdd/.test(imp.pastilles[0]), imp.pastilles);
+      imp.pastilles.length === 1 && /run-demo/.test(imp.pastilles[0]), imp.pastilles);
 
     // Valider le run, puis annuler : inventaire ET protocole doivent revenir
     const cycle = await page.evaluate(async () => {
@@ -811,6 +815,143 @@ const SEED = `(() => {
     check('run : l’annulation rend les aliquots ET le protocole',
       cycle.apresAnnulation === cycle.avant && cycle.fluidesApresAnnulation === 8
       && JSON.stringify(cycle.chargesApresAnnulation) === JSON.stringify([2,2,2,2,2.8,2.8,4,4]), cycle);
+    await page.context().close();
+  }
+
+  /* ============ 8 septies. Protocoles multiples et re-dilutions ============
+     Fonctions ajoutées après coup : plusieurs .tdd dans un même run avec un
+     nombre d'exemplaires par protocole, mémoire des protocoles importés, et
+     recettes de re-dilution manuelle avant le Tecan. */
+  {
+    const page = await newPage(browser);
+    const NOMS = ['Docetaxel','Gemcitabine','Sotorasib','Olaparib','SN-38',
+                  'Staurosporine','Trastuzumab deruxtecan','Datopotamab deruxtecan'];
+    const seed = () => page.evaluate(noms => {
+      state.freezers = [{ id:'F1', name:'Congélateur', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      state.reagents = [];
+      noms.forEach((n, i) => { for (let k = 0; k < 9; k++) state.reagents.push({ id:'r'+i+k, name:n,
+        quantity:'30 µL', units:null, loc:{ freezerId:'F1', zoneId:'Z', boxRow:i % 6, boxCol:(i/6)|0, row:k, col:0 } }); });
+      state.history = []; saveState(); view.tab = 'prep'; render();
+    }, NOMS);
+    const charger = async (nom, mode) => {
+      await page.evaluate(m => { document.getElementById('p-tddfile').setAttribute('data-mode', m); }, mode);
+      await page.setInputFiles('#p-tddfile', { name:nom, mimeType:'text/xml', buffer: Buffer.from(TDD) });
+      await page.waitForTimeout(2000);
+    };
+    const T2 = () => page.evaluate(() => {
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      return { protocoles: document.querySelectorAll('#p-runsrcs .prs-card').length,
+               exemplaires: Array.from(document.querySelectorAll('#p-runsrcs .prs-copies b')).map(T),
+               vehicules: Array.from(document.querySelectorAll('.p-grab-veh')).map(v => [T(v.querySelector('.p-gname')), T(v.querySelector('.p-ntube'))]) };
+    });
+
+    await seed(); await page.waitForTimeout(300);
+    await charger('proto-A.tdd', 'replace');
+    const un = await T2();
+    check('protocoles : un seul .tdd donne la normalisation de référence',
+      un.protocoles === 1 && un.vehicules[0][1] === '99' && un.vehicules[1][1] === '14', un);
+
+    await charger('proto-B.tdd', 'add');
+    const deux = await T2();
+    check('protocoles : deux .tdd cumulent la normalisation',
+      deux.protocoles === 2 && deux.vehicules[0][1] === '198' && deux.vehicules[1][1] === '28', deux);
+
+    const trois = await page.evaluate(async () => {
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      for (let k = 0; k < 2; k++) { document.querySelectorAll('[data-srcinc]')[1].click(); await new Promise(r => setTimeout(r, 450)); }
+      return { exemplaires: Array.from(document.querySelectorAll('#p-runsrcs .prs-copies b')).map(T),
+               vehicules: Array.from(document.querySelectorAll('.p-grab-veh')).map(v => [T(v.querySelector('.p-gname')), T(v.querySelector('.p-ntube'))]) };
+    });
+    check('protocoles : les exemplaires d’un protocole ne multiplient que le sien',
+      JSON.stringify(trois.exemplaires) === JSON.stringify(['×1','×3'])
+      && trois.vehicules[0][1] === '396' && trois.vehicules[1][1] === '56', trois);
+
+    // mémoire des protocoles
+    const mem = await page.evaluate(async () => {
+      const b = document.getElementById('p-tddmem'); if (!b) return { bouton:false };
+      b.click(); await new Promise(r => setTimeout(r, 400));
+      const m = document.getElementById('sidePanelModal');
+      const noms = Array.from(m.querySelectorAll('.tm-name')).map(e => e.textContent);
+      const dansLeRun = m.querySelectorAll('.tm-in').length;
+      m.classList.remove('show');
+      return { bouton:true, noms, dansLeRun };
+    });
+    check('protocoles : les .tdd importés sont mémorisés et marqués « dans le run »',
+      mem.bouton && mem.noms.length === 2 && mem.dansLeRun === 2, mem);
+
+    // retirer le dernier protocole ne doit pas emporter un fluide manuel
+    const retrait = await page.evaluate(async () => {
+      document.getElementById('p-clear').click();
+      await new Promise(r => setTimeout(r, 300));
+      return true;
+    });
+    await charger('proto-A.tdd', 'replace');
+    const survie = await page.evaluate(async () => {
+      document.getElementById('p-addfluid').click();
+      await new Promise(r => setTimeout(r, 200));
+      const trs = document.querySelectorAll('#p-fluidBody tr');
+      const i = trs[trs.length-1].querySelectorAll('input');
+      i[0].value = 'Produit manuel'; i[0].dispatchEvent(new Event('input', { bubbles:true }));
+      i[2].value = '50'; i[2].dispatchEvent(new Event('input', { bubbles:true }));
+      await new Promise(r => setTimeout(r, 500));
+      const avant = Array.from(document.querySelectorAll('#p-fluidBody tr')).map(tr => tr.querySelectorAll('input')[0].value);
+      document.querySelector('[data-srcrm]').click();
+      await new Promise(r => setTimeout(r, 800));
+      return { avant, apres: Array.from(document.querySelectorAll('#p-fluidBody tr')).map(tr => tr.querySelectorAll('input')[0].value) };
+    });
+    check('protocoles : retirer le dernier .tdd garde les fluides saisis à la main',
+      survie.avant.length === 9 && JSON.stringify(survie.apres) === JSON.stringify(['Produit manuel']), survie);
+    await page.context().close();
+  }
+
+  /* ============ 8 octies. Re-dilution manuelle avant le Tecan ============ */
+  {
+    const page = await newPage(browser);
+    const graine = await page.evaluate(async () => {
+      localStorage.removeItem('cryomap_redil_seeded');
+      state.preferences = state.preferences || {}; delete state.preferences.redilRecipes;
+      state.freezers = [{ id:'F1', name:'C', temp:'-80°C', cols:1, rows:1, zones:[
+        { id:'Z', name:'Rack', type:'rack', x:0,y:0,w:1,h:1, rackHeight:6, rackDepth:4, gridRows:9, gridCols:9 }]}];
+      state.reagents = [];
+      for (let k = 0; k < 9; k++) state.reagents.push({ id:'d'+k, name:'Docetaxel', quantity:'30 µL',
+        units:null, loc:{ freezerId:'F1', zoneId:'Z', boxRow:0, boxCol:0, row:k, col:0 } });
+      state.history = []; saveState();
+      const avant = Object.keys((state.preferences||{}).redilRecipes || {}).length;
+      view.tab = 'prep'; render();
+      await new Promise(r => setTimeout(r, 700));
+      return { avant, apres: Object.keys((state.preferences||{}).redilRecipes || {}) };
+    });
+    check('re-dilutions : les recettes pré-réglées sont bien créées',
+      graine.avant === 0 && graine.apres.length === 5 && graine.apres.includes('zolbetuximab'), graine);
+
+    const calc = await page.evaluate(async () => {
+      // 10 µL de stock + 70 µL de diluant = 80 µL de solution de travail
+      state.preferences.redilRecipes = { docetaxel: { displayName:'Docetaxel', stockConc:20, stockUnit:'mg/mL',
+        drawVol:10, pbs:67.6, pbsTween:2.4, finalVol:80, finalConc:2.5, finalUnit:'mg/mL' } };
+      saveState();
+      document.getElementById('p-clear').click();
+      await new Promise(r => setTimeout(r, 300));
+      document.getElementById('p-addfluid').click();
+      const i = document.querySelector('#p-fluidBody tr').querySelectorAll('input');
+      i[0].value = 'Docetaxel'; i[0].dispatchEvent(new Event('input', { bubbles:true }));
+      i[1].value = 'mère';      i[1].dispatchEvent(new Event('input', { bubbles:true }));
+      // 200 µL de solution de travail demandés ⇒ 3 lots de 80 µL ⇒ 30 µL de stock ⇒ 1 tube
+      i[2].value = '200';       i[2].dispatchEvent(new Event('input', { bubbles:true }));
+      await new Promise(r => setTimeout(r, 700));
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      const c = document.querySelector('#p-grab .p-grab:not(.p-grab-veh)');
+      return { badge: T(c && c.querySelector('.p-redil-badge')),
+               tubes: T(c && c.querySelector('.p-ntube')),
+               ligneRecette: !!document.querySelector('#p-recipes .p3-step.redil'),
+               volumesRecette: Array.from(document.querySelectorAll('#p-recipes .p3-step.redil .p3-vol')).map(T) };
+    });
+    check('re-dilutions : le mode opératoire s’affiche même sans dilution en série',
+      calc.ligneRecette === true, calc);
+    check('re-dilutions : la recette montre stock + diluant = solution de travail',
+      JSON.stringify(calc.volumesRecette) === JSON.stringify(['10µL','70µL','80µL']), calc);
+    check('re-dilutions : les tubes sont comptés sur le stock consommé, pas sur le volume final',
+      /×3/.test(calc.badge || '') && calc.tubes === '1', calc);
     await page.context().close();
   }
 

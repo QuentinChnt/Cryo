@@ -170,7 +170,7 @@ Les sauvegardes automatiques y vivent aussi : 10 points de retour au lieu de
 
 ```bash
 npm install
-npm test                 # 75 cas de régression, Playwright
+npm test                 # 84 cas de régression, Playwright
 ```
 
 Chaque cas reproduit un bug réellement observé avant de vérifier sa
@@ -180,6 +180,9 @@ temps — donc de vérifier la fusion et le temps réel sans réseau.
 
 Sur une machine sans Chromium par défaut :
 `CHROMIUM_PATH=/chemin/vers/chromium npm test`
+
+`APP_FILE=autre.html npm test` fait tourner la même suite sur une autre
+variante du fichier, sans toucher au harnais.
 
 ### Le moteur D300e
 

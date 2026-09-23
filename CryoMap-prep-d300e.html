@@ -4884,6 +4884,69 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 .p-tubes .stk{text-align:center!important;width:100%}
 .p-tubes .p-already,.p-tubes .btn{align-self:center!important}
 
+
+/* ---------- Étape de re-dilution manuelle (avant Tecan) ---------- */
+.p3-redil-tag{margin-left:8px;font-size:10.5px;font-weight:600;letter-spacing:.02em;
+  color:var(--warn);text-transform:none;vertical-align:middle}
+.p-redil-badge{display:inline-flex;align-items:center;gap:3px;margin-left:6px;
+  font-size:11px;font-weight:600;color:var(--warn);cursor:help}
+
+
+.p-note-inline{font-size:12.5px;color:var(--ink-3);margin:0 0 14px;font-style:italic}
+
+/* ---------- Bandeau « Protocoles du run » ---------- */
+.p-runsrcs{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;
+  padding:12px 14px;margin:0 0 18px;border:1px solid var(--rule-2);border-radius:var(--r-lg);background:var(--paper)}
+.prs-h{font-size:12px;font-weight:600;color:var(--ink-3);letter-spacing:.02em;flex:0 0 auto}
+.prs-list{display:flex;flex-wrap:wrap;gap:8px;flex:1 1 auto;min-width:0}
+.prs-card{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 12px;
+  border:1px solid var(--rule-2);border-radius:var(--r-md);background:var(--bg-2)}
+.prs-txt{min-width:0}
+.prs-name{font-size:13px;font-weight:600;color:var(--ink);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prs-sub{font-size:11px;color:var(--ink-4)}
+.prs-copies{display:flex;align-items:center;gap:4px}
+.prs-copies b{font-family:var(--mono);font-size:14px;font-weight:600;min-width:28px;text-align:center;color:var(--ink)}
+.prs-step{width:22px;height:22px;border:1px solid var(--rule-2);border-radius:var(--r-xs);background:var(--paper);
+  color:var(--ink-2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:13px}
+.prs-step:hover{border-color:var(--rule-3);color:var(--ink)}
+.prs-del{border:none;background:none;color:var(--ink-4);cursor:pointer;font-size:15px;padding:0 2px}
+.prs-del:hover{color:var(--danger)}
+.prs-empty{font-size:12px;color:var(--ink-4)}
+.prs-mem{margin-left:auto}
+.prs-count{display:inline-block;margin-left:4px;padding:0 6px;border-radius:var(--r-pill);background:var(--bg-2);font-size:11px;color:var(--ink-3)}
+/* Panneau « Mes protocoles » */
+.tm-hint{font-size:12.5px;color:var(--ink-3);margin-bottom:10px}
+.tm-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--rule)}
+.tm-txt{flex:1;min-width:0}
+.tm-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-sub{font-size:12px;color:var(--ink-4)}
+.tm-in{font-size:12px;color:var(--ink-4);padding:0 6px}
+
+
+/* ---------- Editeur de re-dilutions ---------- */
+.prs-btns{display:flex;gap:8px;margin-left:auto}
+.p-redil-badge{cursor:pointer!important}
+.p-redil-badge:hover{text-decoration:underline}
+.rd-hint{font-size:12.5px;color:var(--ink-3);margin-bottom:12px;line-height:1.45}
+.rd-table{display:flex;flex-direction:column;gap:6px}
+.rd-hrow,.rd-row{display:grid;grid-template-columns:minmax(120px,1.6fr) repeat(4,minmax(64px,1fr)) minmax(84px,1fr) 24px;
+  gap:6px;align-items:center}
+.rd-hrow span{font-size:11px;font-weight:600;color:var(--ink-4);letter-spacing:.02em}
+.rd-row .form-input{height:32px;padding:0 8px;font-size:13px;width:100%;box-sizing:border-box}
+.rd-cell{position:relative;display:block}
+.rd-cell .form-input{padding-right:40px}
+.rd-cell small{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:10.5px;color:var(--ink-4);pointer-events:none}
+.rd-out{display:flex;flex-direction:column;font-size:12px;color:var(--ink-3);line-height:1.2}
+.rd-out b{font-family:var(--mono);font-size:13px;color:var(--ink)}
+.rd-out small{font-size:10.5px;color:var(--ink-4)}
+.rd-del{border:none;background:none;color:var(--ink-4);cursor:pointer;font-size:15px}
+.rd-del:hover{color:var(--danger)}
+.rd-row.focus .rd-name{border-color:var(--accent);box-shadow:0 0 0 2px var(--ok-soft)}
+.rd-empty{font-size:12.5px;color:var(--ink-3);margin:8px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rd-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
+#sidePanelModal .modal{max-width:760px!important}
+
+.prs-warn{flex:1 1 100%;font-size:12px;color:var(--warn);background:var(--warn-bg);border-radius:var(--r-sm);padding:6px 10px}
 </style>
 
 
@@ -14139,6 +14202,34 @@ function deleteLiveZone(freezerId, zoneId){
   };
   var DRUGALIAS={"oxaliplatine":"oxaliplatin","cisplatine":"cisplatin","ada":"adagrasib","fluorouracil":"5fu","fluorouracile":"5fu","mitomycine":"mitomycinc"};
   function normDrug(s){ return (s==null?"":String(s)).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,""); }
+  // Recette de re-dilution manuelle AVANT le Tecan (ex. anticorps dilue de 20 a
+  // 2,5 mg/mL avec du PBS + PBS-Tween avant d'etre charge). Cle = nom normalise,
+  // partagee avec l'equipe (vit dans state.preferences, deja synchronise).
+  function redilRecipes(){
+    if(!state.preferences) state.preferences={};
+    if(!state.preferences.redilRecipes || typeof state.preferences.redilRecipes!=="object") state.preferences.redilRecipes={};
+    return state.preferences.redilRecipes;
+  }
+  function seedRedilRecipesOnce(){
+    try{
+      if(localStorage.getItem('cryomap_redil_seeded')) return;
+      localStorage.setItem('cryomap_redil_seeded','1');
+      var rec=redilRecipes();
+      if(Object.keys(rec).length) return;   // deja des recettes : ne rien ecraser
+      var seeds=[
+        {n:'Zolbetuximab', sc:20, su:'mg/mL', dv:10, pbs:67.6, tw:2.4, fv:80, fc:2.5, fu:'mg/mL'},
+        {n:'ASP546C',      sc:20, su:'mg/mL', dv:10, pbs:67.6, tw:2.4, fv:80, fc:2.5, fu:'mg/mL'},
+        {n:'control_dar8', sc:7,  su:'mg/mL', dv:28.6,pbs:49,  tw:2.4, fv:80, fc:2.5, fu:'mg/mL'},
+        {n:'control_dar4', sc:4.8,su:'mg/mL', dv:4.17,pbs:3.59,tw:0.24,fv:8,  fc:2.5, fu:'mg/mL'},
+        {n:'datopotamab',  sc:10, su:'mg/mL', dv:2,   pbs:5.76,tw:0.24,fv:8,  fc:2.5, fu:'mg/mL'}
+      ];
+      seeds.forEach(function(s){ rec[normDrug(s.n)]={displayName:s.n, stockConc:s.sc, stockUnit:s.su,
+        drawVol:s.dv, pbs:s.pbs, pbsTween:s.tw, finalVol:s.fv, finalConc:s.fc, finalUnit:s.fu}; });
+      saveState();
+    }catch(e){}
+  }
+  function redilRecipeFor(name){ var k=normDrug(name); if(!k) return null; return redilRecipes()[k]||null; }
+
   function lev(a,b){ var m=a.length,n=b.length; if(!m)return n; if(!n)return m; var d=[],i,j; for(i=0;i<=m;i++)d[i]=[i]; for(j=0;j<=n;j++)d[0][j]=j; for(i=1;i<=m;i++)for(j=1;j<=n;j++){ var c=a.charAt(i-1)===b.charAt(j-1)?0:1; d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+c); } return d[m][n]; }
   /* Signature chiffree d'un nom : "deruxtecanisotypedar8" -> "8".
      Deux produits dont les chiffres different ne sont JAMAIS le meme produit. */
@@ -14241,36 +14332,41 @@ function deleteLiveZone(freezerId, zoneId){
 
   var prep=loadPrep();
   if(!prep.sources) prep.sources=[];
+  // Restaure un objet prep-like a partir d'un instantane JSON (localStorage au
+  // demarrage, OU une entree choisie dans la bibliotheque de protocoles). Les
+  // deux chemins doivent appliquer EXACTEMENT la meme logique : une divergence
+  // ici serait le meme genre de bug que le retrait d'aliquot qui en supprimait
+  // plusieurs, decouvert plus tot dans ce fichier.
+  function applyPrepFields(s){
+    var d={plates:1,mode:"serial",excess:10,minPrep:20,maxPrep:50,minPip:1,load:2,tubesOv:{},fluids:[],checks:{},norm:null,excluded:{},sources:[]};
+    if(!s) return d;
+    if(s.mode) d.mode=s.mode; if(s.aliquot!=null) d.aliquot=s.aliquot; if(s.maxPrep!=null) d.maxPrep=s.maxPrep;
+    if(s.load!=null) d.load=s.load; if(s.minPrep!=null) d.minPrep=s.minPrep;
+    if(s.plates!=null) d.plates=s.plates; if(s.excess!=null) d.excess=s.excess;
+    // 0.5 etait l'ancien defaut : on repasse a 1 (nouveau defaut) sans toucher aux autres reglages
+    if(s.minPip!=null) d.minPip=(Number(s.minPip)===0.5?1:s.minPip);
+    if(s.norm) d.norm=s.norm;
+    if(s.tubesOv&&typeof s.tubesOv==="object") d.tubesOv=s.tubesOv;
+    if(Array.isArray(s.sources)) d.sources=s.sources;
+    if(s.checks&&typeof s.checks==="object") d.checks=s.checks;
+    if(s.excluded&&typeof s.excluded==="object") d.excluded=s.excluded;
+    if(s.allowExpired) d.allowExpired=true;
+    // PREP_SPOT / PREP_LINK sont declares plus bas : on garde la valeur ici
+    // et on les amorce apres leur initialisation.
+    if(s.spotChoice&&typeof s.spotChoice==="object") d._spotChoice=s.spotChoice;
+    if(s.linkChoice&&typeof s.linkChoice==="object") d._linkChoice=s.linkChoice;
+    if(Array.isArray(s.fluids)&&s.fluids.length){
+      d.fluids=s.fluids.map(function(f){ var o={}; for(var k in f) o[k]=f[k]; o.id=uidp(); return o; });
+    }
+    return d;
+  }
   function loadPrep(){
     // Les protocoles .tdd importés sont conservés d'une session à l'autre
     // (avec leurs réglages) ; « Vider » remet tout à zéro.
-    var d={plates:1,mode:"serial",excess:10,minPrep:20,maxPrep:50,minPip:1,load:2,tubesOv:{},fluids:[],checks:{},norm:null,excluded:{},sources:[]};
-    try{ var raw=localStorage.getItem(PKEY); if(raw){ var s=JSON.parse(raw);
-      if(s.mode) d.mode=s.mode; if(s.aliquot!=null) d.aliquot=s.aliquot; if(s.maxPrep!=null) d.maxPrep=s.maxPrep;
-      if(s.load!=null) d.load=s.load; if(s.minPrep!=null) d.minPrep=s.minPrep;
-      if(s.plates!=null) d.plates=s.plates; if(s.excess!=null) d.excess=s.excess;
-      // 0.5 etait l'ancien defaut : on repasse a 1 (nouveau defaut) sans toucher aux autres reglages
-      if(s.minPip!=null) d.minPip=(Number(s.minPip)===0.5?1:s.minPip);
-      if(s.norm) d.norm=s.norm;
-      if(s.tubesOv&&typeof s.tubesOv==="object") d.tubesOv=s.tubesOv;
-      if(Array.isArray(s.sources)) d.sources=s.sources;
-      // Ces quatre-là étaient écrits par savePrep sans jamais figurer dans
-      // prepSnapshot : « J'ai déjà », les cases cochées et les emplacements
-      // choisis repartaient de zéro à chaque rechargement, alors même que la
-      // validation les exige.
-      if(s.checks&&typeof s.checks==="object") d.checks=s.checks;
-      if(s.excluded&&typeof s.excluded==="object") d.excluded=s.excluded;
-      if(s.allowExpired) d.allowExpired=true;
-      // PREP_SPOT / PREP_LINK sont déclarés plus bas : on garde la valeur ici
-      // et on les amorce après leur initialisation.
-      if(s.spotChoice&&typeof s.spotChoice==="object") d._spotChoice=s.spotChoice;
-      if(s.linkChoice&&typeof s.linkChoice==="object") d._linkChoice=s.linkChoice;
-      if(Array.isArray(s.fluids)&&s.fluids.length){
-        d.fluids=s.fluids.map(function(f){ var o={}; for(var k in f) o[k]=f[k]; o.id=uidp(); return o; });
-      }
-    } }catch(e){}
-    return d;
+    try{ var raw=localStorage.getItem(PKEY); if(raw) return applyPrepFields(JSON.parse(raw)); }catch(e){}
+    return applyPrepFields(null);
   }
+
   function prepSnapshot(){ return {plates:prep.plates,mode:prep.mode,excess:prep.excess,minPrep:prep.minPrep,maxPrep:prep.maxPrep,minPip:prep.minPip,load:prep.load,tubesOv:prep.tubesOv||{},norm:prep.norm,sources:prep.sources||[],
     checks:prep.checks||{}, excluded:prep.excluded||{}, allowExpired:!!prep.allowExpired,
     spotChoice:(typeof PREP_SPOT!=="undefined"&&PREP_SPOT)||{}, linkChoice:(typeof PREP_LINK!=="undefined"&&PREP_LINK)||{},
@@ -14593,6 +14689,230 @@ function deleteLiveZone(freezerId, zoneId){
   var PREP_NOTE=null;
   function showPrepNote(){ var el=document.getElementById("p-parsenote"); if(!el||!PREP_NOTE) return;
     el.className=PREP_NOTE.cls; el.textContent=PREP_NOTE.txt; }
+  /* ============================================================
+     EXEMPLAIRES PAR PROTOCOLE + MEMOIRE DES .tdd
+     Un run peut combiner plusieurs .tdd ; chacun a desormais son propre
+     nombre d'exemplaires (avant : un multiplicateur unique pour tout le run,
+     impossible de lancer A x2 et B x3 ensemble). La normalisation DMSO /
+     tampon-Tween est gardee par protocole pour etre multipliee a part.
+     ============================================================ */
+  function ensureSources(){
+    if(!prep.sources) prep.sources=[];
+    var legacy=Math.max(1,Number(prep.plates)||1), migrated=false;
+    // Prepas enregistrees par une version anterieure : protocoles sans
+    // identifiant et fluides non rattaches. Sans ca, les boutons d'exemplaires
+    // portaient data-srcinc="" et ne visaient aucun protocole (clic muet).
+    prep.sources.forEach(function(s,i){
+      if(!s.id){ s.id="s"+Date.now().toString(36)+i+Math.floor(Math.random()*1e4); migrated=true; }
+      if(!(Number(s.copies)>=1)){ s.copies=legacy; migrated=true; }
+    });
+    (prep.fluids||[]).forEach(function(f){
+      if(f.srcId && prep.sources.some(function(s){return s.id===f.srcId;})) return;
+      var s=f.src?prep.sources.filter(function(x){return x.name===f.src;})[0]:null;
+      if(s){ f.srcId=s.id; migrated=true; }
+    });
+    // Un seul protocole ancien : la normalisation globale est entierement la sienne.
+    if(prep.sources.length===1 && !prep.sources[0].norm && prep.norm){
+      prep.sources[0].norm=JSON.parse(JSON.stringify(prep.norm)); migrated=true; }
+    if(migrated){ try{ savePrep(); }catch(e){} }
+    return prep.sources;
+  }
+  // Plusieurs protocoles anciens sans normalisation propre : impossible de
+  // repartir le DMSO/Tween entre eux. On le dit, plutot que de le faire mal.
+  function legacyNormNote(){ var l=prep.sources||[];
+    return l.length>1 && l.some(function(s){return !s.norm;}); }
+  function srcById(id){ var l=ensureSources(); for(var i=0;i<l.length;i++) if(l[i].id===id) return l[i]; return null; }
+  // Multiplicateur d'un fluide : les exemplaires de SON protocole. Fluides
+  // saisis a la main (sans protocole) : l'ancien reglage global s'applique.
+  function fluidMult(f){
+    var s=f&&f.srcId?srcById(f.srcId):null;
+    if(s) return Math.max(1,Number(s.copies)||1);
+    return Math.max(1,Number(prep.plates)||1);
+  }
+  function setSrcCopies(id,v){ var s=srcById(id); if(!s) return; s.copies=Math.max(1,Math.min(99,Math.round(Number(v)||1))); savePrep(); }
+  // Volumes de normalisation du run : somme, protocole par protocole, de sa
+  // normalisation x ses exemplaires. Repli sur l'ancien calcul global si un
+  // protocole ancien n'a pas conserve sa normalisation propre.
+  function runNormLoads(){
+    var l=ensureSources();
+    var perSrc=l.length && l.every(function(s){ return !!s.norm; });
+    if(perSrc){
+      var d=0,t=0; l.forEach(function(s){ var k=Math.max(1,Number(s.copies)||1);
+        d+=((s.norm.dmso&&s.norm.dmso.load)||0)*k; t+=((s.norm.tween&&s.norm.tween.load)||0)*k; });
+      return {dmso:d, tween:t};
+    }
+    var n=prep.norm; if(!n) return {dmso:0,tween:0};
+    var p=Math.max(1,Number(prep.plates)||1);
+    return {dmso:((n.dmso&&n.dmso.load)||0)*p, tween:((n.tween&&n.tween.load)||0)*p};
+  }
+  function totalCopies(){ var l=ensureSources(); if(!l.length) return Math.max(1,Number(prep.plates)||1);
+    return l.reduce(function(a,s){ return a+Math.max(1,Number(s.copies)||1); },0); }
+
+  // ---- Memoire des .tdd : chaque fichier importe est retenu (local au poste) ----
+  var TDDFILES_KEY="cryomap-tdd-files-v1";
+  function tddFiles(){ try{ var a=JSON.parse(localStorage.getItem(TDDFILES_KEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+  function saveTddFiles(a){ try{ localStorage.setItem(TDDFILES_KEY, JSON.stringify(a)); return true; }catch(e){ return false; } }
+  function cleanFluid(f){ return {drug:f.drug,dil:f.dil,load:f.load,conc:f.conc,unit:f.unit,sol:f.sol,code:f.code}; }
+  // Meme nom => mise a jour (reimporter un .tdd corrige remplace l'ancien)
+  function rememberTdd(name, fluids, norm){
+    var a=tddFiles().filter(function(x){ return x.name!==name; });
+    a.unshift({id:"t"+Date.now().toString(36)+Math.floor(Math.random()*1e4), name:name,
+      fluids:(fluids||[]).map(cleanFluid), norm:norm||null, savedAt:Date.now()});
+    saveTddFiles(a.slice(0,40));
+  }
+  function forgetTdd(id){ saveTddFiles(tddFiles().filter(function(x){ return x.id!==id; })); }
+  // Ajoute un protocole au run (depuis un fichier OU depuis la memoire) : un
+  // seul chemin, pour que les deux se comportent exactement pareil.
+  function addSourceToRun(name, parsedFluids, norm, replace){
+    var srcId="s"+Date.now()+Math.floor(Math.random()*1000);
+    var fl=(parsedFluids||[]).map(function(f){ var o={}; for(var k in f) o[k]=f[k]; o.id=uidp(); o.src=name; o.srcId=srcId; return o; });
+    var entry={name:name, n:fl.length, id:srcId, copies:1, norm:norm||null};
+    if(replace || !prep.fluids.length){
+      prep.fluids=fl; prep.norm=norm||null; prep.plates=1; prep.sources=[entry];
+    } else {
+      ensureSources();
+      prep.fluids=prep.fluids.concat(fl);
+      prep.sources=prep.sources.concat([entry]);
+      // prep.norm reste la somme brute (compatibilite) ; le calcul reel passe par runNormLoads()
+      if(norm){ if(!prep.norm) prep.norm=JSON.parse(JSON.stringify(norm));
+        else prep.norm={ dmso:{disp:((prep.norm.dmso||{}).disp||0)+((norm.dmso||{}).disp||0), load:((prep.norm.dmso||{}).load||0)+((norm.dmso||{}).load||0)},
+                         tween:{disp:((prep.norm.tween||{}).disp||0)+((norm.tween||{}).disp||0), load:((prep.norm.tween||{}).load||0)+((norm.tween||{}).load||0)},
+                         plates:(prep.norm.plates||0)+(norm.plates||0) }; }
+    }
+    prep.excluded={};
+    savePrep();
+    return srcId;
+  }
+  function removeSourceFromRun(id){
+    var l=ensureSources(), s=srcById(id); if(!s) return;
+    prep.fluids=prep.fluids.filter(function(f){ return f.srcId!==id; });
+    prep.sources=l.filter(function(x){ return x.id!==id; });
+    if(!prep.sources.length){
+      // Des fluides saisis a la main peuvent subsister : ils n'appartiennent a
+      // aucun protocole et ne doivent pas disparaitre avec le dernier .tdd.
+      // resetPrepRun() vidait tout, y compris eux.
+      prep.norm=null; prep.sources=[];
+      if(!prep.fluids.length){ resetPrepRun(); return; }
+      savePrep(); return;
+    }
+    // normalisation brute recalculee sur les protocoles restants
+    var hasAll=prep.sources.every(function(x){return !!x.norm;});
+    if(hasAll){ var d={disp:0,load:0}, t={disp:0,load:0}, p=0;
+      prep.sources.forEach(function(x){ d.disp+=(x.norm.dmso||{}).disp||0; d.load+=(x.norm.dmso||{}).load||0;
+        t.disp+=(x.norm.tween||{}).disp||0; t.load+=(x.norm.tween||{}).load||0; p+=x.norm.plates||0; });
+      prep.norm={dmso:d,tween:t,plates:p}; }
+    savePrep();
+  }
+  // Panneau « Mes protocoles » : les .tdd deja importes, a rajouter au run en un clic
+  function openTddMemory(){
+    var m=document.getElementById("sidePanelModal"); if(!m) return;
+    var en=(lang==="en");
+    m.querySelector(".modal-title").textContent=en?"My protocols":"Mes protocoles";
+    function paint(){
+      var a=tddFiles(), inRun={}; ensureSources().forEach(function(s){ inRun[s.name]=1; });
+      var body=m.querySelector(".modal-body");
+      body.innerHTML = a.length ? ('<div class="tm-hint">'+(en?"Every imported .tdd is kept here. Add one to the current run without reopening the file.":"Chaque .tdd importé est gardé ici. Ajoute-le au run en cours sans rouvrir le fichier.")+'</div>'
+        + a.map(function(x){ var d=new Date(x.savedAt||0);
+          return '<div class="tm-row"><div class="tm-txt"><div class="tm-name">'+esc(x.name)+'</div>'
+            +'<div class="tm-sub">'+(x.fluids||[]).length+' '+(en?"fluids":"fluides")+' \u00b7 '+d.toLocaleDateString(en?"en-GB":"fr-FR")+'</div></div>'
+            +(inRun[x.name]?'<span class="tm-in">'+(en?"in run":"dans le run")+'</span>'
+              :'<button class="btn primary sm" data-tmadd="'+esc(x.id)+'">'+(en?"Add to run":"Ajouter au run")+'</button>')
+            +'<button class="btn ghost sm" data-tmdel="'+esc(x.id)+'" title="'+(en?"Forget":"Oublier")+'">\u00d7</button></div>';
+        }).join('')) : '<div class="tm-hint">'+(en?"No protocol kept yet — import a .tdd first.":"Aucun protocole gardé — importe d'abord un .tdd.")+'</div>';
+      body.onclick=function(ev){
+        var ad=ev.target.closest("[data-tmadd]"), dl=ev.target.closest("[data-tmdel]");
+        if(ad){ var x=tddFiles().find(function(y){return y.id===ad.getAttribute("data-tmadd");}); if(!x) return;
+          addSourceToRun(x.name, x.fluids, x.norm, false);
+          m.classList.remove("show"); refillFluids(); renderPrepTab(document.getElementById("canvas"));
+          if(typeof toast==="function") toast((en?"Added: ":"Ajouté : ")+x.name,"success"); return; }
+        if(dl){ forgetTdd(dl.getAttribute("data-tmdel")); paint(); renderPrepTab(document.getElementById("canvas")); }
+      };
+    }
+    paint(); m.classList.add("show");
+  }
+  /* ---------- Re-dilutions avant Tecan : editeur (dans le module) ----------
+     L'utilisateur saisit 5 valeurs ; volume final et concentration finale sont
+     CALCULES (volume = prelevement + PBS + PBS-Tween ; conc = stock x prelev. /
+     final), ce qui evite une incoherence entre les champs. */
+  function redilFrom(name, stockConc, unit, draw, pbs, tween){
+    var fv=(Number(draw)||0)+(Number(pbs)||0)+(Number(tween)||0);
+    var fc=(fv>0&&stockConc!=null&&stockConc!=="")?(Number(stockConc)*(Number(draw)||0)/fv):null;
+    return {displayName:name, stockConc:(stockConc===""||stockConc==null)?null:Number(stockConc), stockUnit:unit||"mg/mL",
+      drawVol:Number(draw)||0, pbs:Number(pbs)||0, pbsTween:Number(tween)||0,
+      finalVol:Math.round(fv*100)/100, finalConc:fc==null?null:Math.round(fc*1000)/1000, finalUnit:unit||"mg/mL"};
+  }
+  function openRedilEditor(focusName){
+    var m=document.getElementById("sidePanelModal"); if(!m) return;
+    var en=(lang==="en");
+    m.querySelector(".modal-title").textContent=en?"Pre-dilutions before the Tecan":"Re-dilutions avant le Tecan";
+    var body=m.querySelector(".modal-body");
+    // brouillon : on n'ecrit dans les preferences qu'a « Enregistrer »
+    var rec=redilRecipes(), rows=Object.keys(rec).map(function(k){ var r=rec[k];
+      return {name:r.displayName||k, sc:r.stockConc, u:r.stockUnit||"mg/mL", d:r.drawVol, p:r.pbs, t:r.pbsTween}; });
+    if(focusName && !rows.some(function(r){ return normDrug(r.name)===normDrug(focusName); }))
+      rows.push({name:focusName, sc:"", u:"mg/mL", d:"", p:"", t:""});
+    var runNames=[]; (prep.fluids||[]).forEach(function(f){ var n=(f.drug||"").trim(); if(n && runNames.indexOf(n)<0) runNames.push(n); });
+    function num(v){ return (v===""||v==null||!isFinite(Number(v)))?null:Number(v); }
+    function computed(r){ var fv=(num(r.d)||0)+(num(r.p)||0)+(num(r.t)||0);
+      var fc=(fv>0&&num(r.sc)!=null)?num(r.sc)*(num(r.d)||0)/fv:null; return {fv:fv, fc:fc}; }
+    function paint(){
+      var h='<div class="rd-hint">'+(en
+        ?'For products you dilute by hand before loading them. The number of tubes to pull is then computed on the <b>stock</b> actually used.'
+        :'Pour les produits que tu dilues à la main avant de les charger. Le nombre de tubes à sortir est alors calculé sur le <b>stock</b> réellement consommé.')+'</div>';
+      h+='<datalist id="rd-names">'+runNames.map(function(n){ return '<option value="'+esc(n)+'">'; }).join('')+'</datalist>';
+      h+='<div class="rd-table"><div class="rd-hrow"><span>'+(en?"Product":"Produit")+'</span><span>Stock</span><span>'+(en?"Draw":"Prélever")+'</span><span>PBS</span><span>PBS-Tween</span><span>'+(en?"Final":"Final")+'</span><span></span></div>';
+      rows.forEach(function(r,i){ var c=computed(r);
+        var foc=focusName&&normDrug(r.name)===normDrug(focusName);
+        h+='<div class="rd-row'+(foc?' focus':'')+'" data-i="'+i+'">'
+          +'<input class="form-input rd-name" list="rd-names" value="'+esc(r.name)+'" placeholder="'+(en?"name":"nom")+'">'
+          +'<span class="rd-cell"><input class="form-input rd-n" data-f="sc" value="'+(r.sc==null?"":r.sc)+'" inputmode="decimal"><small>'+esc(r.u)+'</small></span>'
+          +'<span class="rd-cell"><input class="form-input rd-n" data-f="d" value="'+(r.d==null?"":r.d)+'" inputmode="decimal"><small>µL</small></span>'
+          +'<span class="rd-cell"><input class="form-input rd-n" data-f="p" value="'+(r.p==null?"":r.p)+'" inputmode="decimal"><small>µL</small></span>'
+          +'<span class="rd-cell"><input class="form-input rd-n" data-f="t" value="'+(r.t==null?"":r.t)+'" inputmode="decimal"><small>µL</small></span>'
+          +'<span class="rd-out"><b>'+(c.fv>0?fmt(c.fv):"—")+'</b> µL'+(c.fc!=null?'<small>'+fmt(Math.round(c.fc*100)/100)+' '+esc(r.u)+'</small>':'')+'</span>'
+          +'<button class="rd-del" data-del="'+i+'" title="'+(en?"Remove":"Supprimer")+'">\u00d7</button></div>';
+      });
+      h+='</div>';
+      if(!rows.length) h+='<div class="rd-empty">'+(en?"No pre-dilution yet.":"Aucune re-dilution pour l'instant.")
+        +' <button class="btn ghost sm" id="rd-seed">'+(en?"Add Zolbetuximab, ASP546C, control_dar8/dar4, datopotamab":"Ajouter Zolbetuximab, ASP546C, control_dar8/dar4, datopotamab")+'</button></div>';
+      h+='<div class="rd-actions"><button class="btn ghost sm" id="rd-add">+ '+(en?"Add a product":"Ajouter un produit")+'</button>'
+        +'<span style="flex:1"></span><button class="btn primary" id="rd-save">'+(en?"Save":"Enregistrer")+'</button></div>';
+      body.innerHTML=h;
+      // la saisie ne repeint que la cellule calculee : le curseur ne saute pas
+      body.querySelectorAll(".rd-row").forEach(function(rowEl){
+        var i=+rowEl.getAttribute("data-i");
+        rowEl.querySelector(".rd-name").oninput=function(e){ rows[i].name=e.target.value; };
+        rowEl.querySelectorAll(".rd-n").forEach(function(inp){ inp.oninput=function(e){
+          rows[i][inp.getAttribute("data-f")]=e.target.value.replace(",",".");
+          var c=computed(rows[i]); rowEl.querySelector(".rd-out").innerHTML='<b>'+(c.fv>0?fmt(c.fv):"—")+'</b> µL'
+            +(c.fc!=null?'<small>'+fmt(Math.round(c.fc*100)/100)+' '+esc(rows[i].u)+'</small>':''); }; });
+      });
+      body.querySelectorAll("[data-del]").forEach(function(b){ b.onclick=function(){ rows.splice(+b.getAttribute("data-del"),1); paint(); }; });
+      var sd=document.getElementById("rd-seed"); if(sd) sd.onclick=function(){
+        [["Zolbetuximab",20,10,67.6,2.4],["ASP546C",20,10,67.6,2.4],["control_dar8",7,28.6,49,2.4],
+         ["control_dar4",4.8,4.17,3.59,0.24],["datopotamab",10,2,5.76,0.24]].forEach(function(s){
+          rows.push({name:s[0],sc:s[1],u:"mg/mL",d:s[2],p:s[3],t:s[4]}); });
+        paint(); };
+      document.getElementById("rd-add").onclick=function(){ rows.push({name:"",sc:"",u:"mg/mL",d:"",p:"",t:""}); paint();
+        var ins=body.querySelectorAll(".rd-name"); if(ins.length) ins[ins.length-1].focus(); };
+      document.getElementById("rd-save").onclick=function(){
+        var out={}, bad=0;
+        rows.forEach(function(r){ var n=(r.name||"").trim(); if(!n) return;
+          if(!(num(r.d)>0)){ bad++; return; }   // sans volume preleve, la recette n'a pas de sens
+          out[normDrug(n)]=redilFrom(n, num(r.sc), r.u, num(r.d), num(r.p)||0, num(r.t)||0); });
+        state.preferences=state.preferences||{}; state.preferences.redilRecipes=out;
+        if(typeof saveState==="function") saveState();
+        m.classList.remove("show");
+        // renderPrepTab (et pas seulement renderResults) : le compteur du bouton
+        // « Re-dilutions » vit dans le bandeau, reconstruit par l'onglet.
+        renderPrepTab(document.getElementById("canvas"));
+        if(typeof toast==="function") toast(bad
+          ? (en?bad+" row(s) ignored: no draw volume":bad+" ligne(s) ignorée(s) : volume à prélever manquant")
+          : (en?"Pre-dilutions saved":"Re-dilutions enregistrées"), bad?"warn":"success");
+      };
+    }
+    paint(); m.classList.add("show");
+  }
   var PREP_SPOT={};   // nom normalise -> CLE de l'emplacement choisi (zone|niveau|prof)
   var PREP_LINK={};   // nom du .tdd -> cle produit de l'inventaire (association manuelle)
   // Amorcage depuis le stockage : ces deux tables sont declarees APRES
@@ -14649,7 +14969,7 @@ function deleteLiveZone(freezerId, zoneId){
     var arr=[]; for(var i=0;i<n;i++) arr.push(sf);
     return arr;
   }
-  function computeTree(fmap, aliqOverride){
+  function computeTree(fmap, aliqOverride, redil){
     // Prelevement minimum : 1 µL par defaut, librement modifiable par l'operateur
     var e=(Number(prep.excess)||0)/100;
     var minPip=Number(prep.minPip); if(!(minPip>0)) minPip=1; var dmin=minPip;
@@ -14689,10 +15009,24 @@ function deleteLiveZone(freezerId, zoneId){
     var ALIQ_DEFAULT=10;
     var aliqFromCard=(aliqOverride!=null&&aliqOverride>0);
     var aliquot=aliqFromCard?Number(aliqOverride):ALIQ_DEFAULT;
-    var tubes=aliquot?Math.max(1,Math.ceil(mother.used/aliquot)):null;
-    var leftover=aliquot?tubes*aliquot-mother.used:null;
+    // Re-dilution manuelle avant Tecan : le volume qui compte pour compter les
+    // tubes du CONGELATEUR n'est plus mother.used (volume de solution mere pour
+    // le Tecan) mais le volume de STOCK consomme pour fabriquer, par lots de
+    // redil.finalVol, assez de solution mere. Sans quoi l'app comptait le
+    // volume final au lieu du volume reellement preleve sur l'aliquot stocke.
+    var redilInfo=null, consumeVol=mother.used;
+    if(redil && Number(redil.finalVol)>0 && Number(redil.drawVol)>0){
+      var _fv=Number(redil.finalVol), _dv=Number(redil.drawVol);
+      var batches=Math.max(1, Math.ceil(mother.used/_fv));
+      var stockUsed=batches*_dv;
+      consumeVol=stockUsed;
+      redilInfo={recipe:redil, batches:batches, stockUsed:stockUsed,
+                 madeVol:batches*_fv, workingLeftover:batches*_fv-mother.used};
+    }
+    var tubes=aliquot?Math.max(1,Math.ceil(consumeVol/aliquot)):null;
+    var leftover=aliquot?tubes*aliquot-consumeVol:null;
     var totalDiluent=dils.reduce(function(a,n){return a+(n.diluent||0);},0);
-    return {empty:false,nodes:nodes,mother:mother,dils:dils,tubes:tubes,leftover:leftover,totalDiluent:totalDiluent,aliquot:aliquot,aliqFromCard:aliqFromCard};
+    return {empty:false,nodes:nodes,mother:mother,dils:dils,tubes:tubes,leftover:leftover,totalDiluent:totalDiluent,aliquot:aliquot,aliqFromCard:aliqFromCard,redil:redilInfo};
   }
 
   function groupResults(){
@@ -14703,7 +15037,7 @@ function deleteLiveZone(freezerId, zoneId){
       // Comment le produit a-t-il ete identifie ? Un rapprochement approche
       // doit se VOIR : c'est le silence qui rendait la confusion dangereuse.
       var _match=_linked?'manuel':(_exact?'exact':(inv?'approche':'absent')); var fmap={}; var missingConc=false, any=false; var groupSol=null, concByFactor={}, concUnit=null;
-      g.items.forEach(function(f){ var load=((f.load===""||f.load==null)?(Number(prep.load)||50):(Number(f.load)||0))*plates; var d=interpretDil(f.dil); var factor=null;
+      g.items.forEach(function(f){ var load=((f.load===""||f.load==null)?(Number(prep.load)||50):(Number(f.load)||0))*fluidMult(f); var d=interpretDil(f.dil); var factor=null;
         if(d&&d.factor!=null) factor=d.factor; else if(d&&d.conc!=null) missingConc=true;
         if(factor!=null&&factor>=1){ fmap[factor]=(fmap[factor]||0)+load; any=true; if(f.conc!=null) concByFactor[factor]=f.conc; }
         if(f.sol) groupSol=f.sol; if(f.unit) concUnit=f.unit; });
@@ -14712,7 +15046,7 @@ function deleteLiveZone(freezerId, zoneId){
       // plus petit, et l'ecart doit se voir.
       var _volAll=(_sp0&&_sp0.volAll&&_sp0.volAll.length>1)?_sp0.volAll.slice().sort(function(x,y){return x-y;}):null;
       // Nombre de tubes impose par l'operateur : il prime sur le calcul.
-      var r=computeTree(fmap, _av0); if(r.empty){ r={empty:true,mother:{used:0,load:0},dils:[],tubes:null,leftover:null,totalDiluent:0,aliquot:null}; }
+      var r=computeTree(fmap, _av0, redilRecipeFor(g.name)); if(r.empty){ r={empty:true,mother:{used:0,load:0},dils:[],tubes:null,leftover:null,totalDiluent:0,aliquot:null}; }
       r.name=g.name;
       // Surcharge manuelle du nombre de tubes (prime sur le calcul)
       var _ovK=normDrug(g.name||"");
@@ -14811,7 +15145,9 @@ function deleteLiveZone(freezerId, zoneId){
       +'<div class="ph-r">'
         +'<span class="ph-kpi"><b>'+totT+'</b>'+(en?(totT>1?"tubes":"tube"):(totT>1?"tubes":"tube"))+'</span>'
         +'<span class="ph-sep"></span><span class="ph-kpi"><b>'+toPull.length+'</b>'+(en?"products":"produits")+'</span>'
-        +(function(){ var np=Math.max(1,Number(prep.plates)||1);
+        +(function(){ var ns=(prep.sources||[]).length;
+            if(ns>1) return '<span class="ph-sep"></span><span class="ph-kpi"><b>'+ns+'</b>'+(en?"protocols":"protocoles")+'</span>';
+            var np=totalCopies();
             return '<span class="ph-sep"></span><span class="ph-kpi"><b>'+np+'</b>'
               +(en?(np>1?"copies":"copy"):(np>1?"exemplaires":"exemplaire"))+'</span>'; })()
       +'</div></div>'
@@ -14902,6 +15238,16 @@ function deleteLiveZone(freezerId, zoneId){
              +(en?"no volume on the reagent card — 10 µL assumed":"aucun volume sur la fiche — 10 µL supposés")
              +'">'+(en?"assumed":"supposé")+'</span>'):"")
         +(r.leftover!=null?LF("gSubLeft",{v:fmt(r.leftover)}):"");
+      // Cette drogue se re-dilue AVANT le Tecan (recette definie dans les
+      // reglages) : le nombre de tubes ci-dessus est deja calcule sur le
+      // volume de STOCK necessaire, pas sur le volume de solution finale.
+      if(r.redil){
+        var _rc=r.redil.recipe, _add=(Number(_rc.pbs)||0)+(Number(_rc.pbsTween)||0);
+        var _rtitle=en
+          ? ('Pre-dilute before loading: draw '+fmt(_rc.drawVol)+' µL of stock + '+fmt(_add)+' µL diluent (PBS + PBS-Tween) \u2192 '+fmt(_rc.finalVol)+' µL at working concentration. '+r.redil.batches+' batch(es) needed.')
+          : ('À rediluer avant chargement : prélever '+fmt(_rc.drawVol)+' µL de stock + '+fmt(_add)+' µL de diluant (PBS + PBS-Tween) → '+fmt(_rc.finalVol)+' µL à la concentration de travail. '+r.redil.batches+' lot(s) à préparer.');
+        sub+=' <span class="p-redil-badge" data-redil="'+esc(r.name)+'" title="'+esc(_rtitle)+'">⚗ '+(en?"redilute":"rediluer")+(r.redil.batches>1?(' ×'+r.redil.batches):'')+'</span>';
+      }
       h+='<div class="p-grab'+(done?' done':'')+'" data-tog="'+esc(gid)+'"><span class="cbar" style="background:'+c+';position:absolute;left:0;top:50%;transform:translateY(-50%);height:104px;width:5px;border-radius:3px;z-index:2"></span>';
       h+='<div class="p-gid"><div class="p-gtext"><div class="p-gname">'+esc(capFirst(r.name))+(r.code?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:var(--r-xs);background:'+shade(c,.82)+';color:'+c+';font-family:ui-monospace,SFMono-Regular,monospace">'+esc(r.code)+'</span>':'')+(r.match==='approche'?' <span class="p-approx" title="'+esc(en?('Name not found as such in CryoMap. Nearest product used: '+(r.invName||'')):('Nom introuvable tel quel dans CryoMap. Produit le plus proche retenu : '+(r.invName||'')))+'">\u2248 '+esc(r.invName||'')+'</span>':'')+'</div><div class="p-gsub">'+sub+'</div></div></div>';
       h+='<div class="p-tubes"><div class="p-tmeta"><div class="n">'
@@ -14968,10 +15314,17 @@ function deleteLiveZone(freezerId, zoneId){
   function recipesHTML(valid){
     var vv=valid.filter(function(r){return r.hasData;});
     if(vv.length===0) return "";
-    var withDil=vv.filter(function(r){return r.dils.length>0;});
+    // Une drogue rediluee a la main AVANT le Tecan a un mode operatoire a
+    // montrer, meme chargee « mere » (aucune dilution en serie) — c'est meme le
+    // cas courant pour un anticorps. Elle n'apparaissait nulle part : la carte
+    // affichait « rediluer » et la section disait « Aucune dilution ».
+    var withDil=vv.filter(function(r){return r.dils.length>0 || r.redil;});
     var h='<div class="p-sec prep"><span class="ic">⚗</span>'+L("secPrepare")+'</div>';
     h+='<div class="p-legend"><span><span class="sw" style="background:var(--accent)"></span>'+L("legendDrawn")+'</span><span><span class="sw dil"></span>'+L("legendDiluent")+'</span><span>'+L("legendHeight")+'</span></div>';
     if(withDil.length===0) return h+'<div class="p-empty">'+L("noDil")+'</div>';
+    // Message d'information quand il n'y a QUE des pre-dilutions
+    if(!withDil.some(function(r){return r.dils.length>0;}))
+      h+='<div class="p-note-inline">'+L("noDil")+'</div>';
         // Echelle PHYSIQUE : les tubes de dilution font 500 µL. Le remplissage affiche
     // la proportion reelle dans le tube, donc 20 µL apparait bien comme un fond de tube.
     var TUBE_CAP=500;
@@ -14990,6 +15343,37 @@ function deleteLiveZone(freezerId, zoneId){
         ? 'Diluent not known for this product — <b>'+esc(dilLabel(r.diluent))+'</b> assumed. Check it before preparing.'
         : 'Diluant inconnu pour ce produit — <b>'+esc(dilLabel(r.diluent))+'</b> supposé. À vérifier avant de préparer.')+'</span></div>';
       h+='<div class="p-diagram"><div class="p-diagram-steps">';
+      // tube() ne depend que de ses parametres (pas de n/idx) : hisse hors de la
+      // boucle pour pouvoir aussi l'utiliser sur l'etape de re-dilution ci-dessous.
+      function tube(tag, conc, fillPct, col, vol, unitLbl, cls){
+        return '<div class="p3-tu '+(cls||'')+'">'
+          +'<div class="p3-tag">'+tag+'</div>'
+          +'<div class="p3-tube"><div class="p3-lid" style="background:'+col+'"></div>'
+            +'<div class="p3-glass"><div class="p3-fill" style="height:'+fillPct+'%;background:'+col+'"></div>'
+            +'<div class="p3-gloss"></div></div></div>'
+          +'<div class="p3-vol">'+vol+'<span>'+unitLbl+'</span></div>'
+          +'</div>';
+      }
+      // ===== Re-dilution manuelle avant Tecan (si une recette est definie pour
+      // cette drogue) : STOCK (congelateur) + PBS/PBS-Tween = solution mere.
+      // Le nom de la drogue est alors affiche ICI, pas sur la 1re dilution. =====
+      var hasRedilRow=!!r.redil;
+      if(r.redil){
+        var _rc=r.redil.recipe, _addV=(Number(_rc.pbs)||0)+(Number(_rc.pbsTween)||0);
+        var _hS=Math.max(2,(Number(_rc.drawVol)/maxVol)*100);
+        var _hA=Math.max(2,(_addV/maxVol)*100);
+        var _hO=Math.max(2,(Number(_rc.finalVol)/maxVol)*100);
+        var _batTxt=r.redil.batches>1?(' \u00d7'+r.redil.batches+' '+(curLang()==="en"?"batches":"lots")):'';
+        h+='<div class="p3-step redil"><span class="cbar" style="background:'+c+';position:absolute;left:0;top:50%;transform:translateY(-50%);height:104px;width:5px;border-radius:3px;z-index:2"></span>';
+        h+='<div class="p3-row">';
+        h+='<div class="p3-name">'+esc(capFirst(r.name))+'<span class="p3-redil-tag">'+(curLang()==="en"?"pre-dilution":"pré-dilution")+_batTxt+'</span></div>';
+        h+=tube((curLang()==="en"?"stock":"stock"), null, _hS, c, fmt(_rc.drawVol), '\u00b5L', 'src');
+        h+='<div class="p3-op">+</div>';
+        h+=tube('PBS + PBS-Tween', null, _hA, '#b9c6be', fmt(_addV), '\u00b5L', 'dil');
+        h+='<div class="p3-op eq">=</div>';
+        h+=tube(L("tuMother"), null, _hO, c, fmt(_rc.finalVol), '\u00b5L', 'out');
+        h+='</div></div>';
+      }
       // ===== Une ligne par dilution : PRELEVER + AJOUTER = OBTENIR (3 tubes) =====
       var m=r.mother;
       r.dils.forEach(function(n,idx){
@@ -15000,22 +15384,13 @@ function deleteLiveZone(freezerId, zoneId){
         var hDraw=Math.max(2,(n.drawFromParent/maxVol)*100);
         var hDil =Math.max(2,(n.diluent/maxVol)*100);
         var hTot =Math.max(2,(n.prepared/maxVol)*100);
-        function tube(tag, conc, fillPct, col, vol, unitLbl, cls){
-          return '<div class="p3-tu '+(cls||'')+'">'
-            +'<div class="p3-tag">'+tag+'</div>'
-            +'<div class="p3-tube"><div class="p3-lid" style="background:'+col+'"></div>'
-              +'<div class="p3-glass"><div class="p3-fill" style="height:'+fillPct+'%;background:'+col+'"></div>'
-              +'<div class="p3-gloss"></div></div></div>'
-            +'<div class="p3-vol">'+vol+'<span>'+unitLbl+'</span></div>'
-
-            +'</div>';
-        }
         h+='<div class="p3-step'+(sd?' done':'')+'" data-tog="'+esc(sid)+'"><span class="cbar" style="background:'+c+';position:absolute;left:0;top:50%;transform:translateY(-50%);height:104px;width:5px;border-radius:3px;z-index:2"></span>';
         h+='<div class="p3-check">\u2713</div>';
         h+='<div class="p3-row">';
         // Le nom vit dans la rangee des tubes : il partage donc exactement
-        // leur axe vertical, celui de la barre de couleur.
-        h+='<div class="p3-name">'+(idx===0?esc(capFirst(r.name)):'')+'</div>';
+        // leur axe vertical, celui de la barre de couleur. Deja affiche sur
+        // l'etape de re-dilution le cas echeant : pas de doublon.
+        h+='<div class="p3-name">'+((idx===0&&!hasRedilRow)?esc(capFirst(r.name)):'')+'</div>';
         h+=tube(parentTag, parentConc, hDraw, c, fmt(n.drawFromParent), '\u00b5L', 'src');
         h+='<div class="p3-op">+</div>';
         h+=tube(esc(dl), null, hDil, '#b9c6be', fmt(n.diluent), '\u00b5L', 'dil');
@@ -15035,15 +15410,15 @@ function deleteLiveZone(freezerId, zoneId){
   }
 
   function normHTML(valid){
-    var n=prep.norm; if(!n) return "";
+    var n=prep.norm; if(!n && !(prep.sources||[]).some(function(s){return s.norm;})) return "";
     var vv=(valid||[]).filter(function(r){return r.hasData;});
     var dmsoDil=0, twDil=0;
     vv.forEach(function(r){ var s=(r.diluent||"").toLowerCase();
       if(s.indexOf("tween")>=0||s.indexOf("aq")>=0) twDil+=r.totalDiluent||0;
       else if(s.indexOf("dmso")>=0) dmsoDil+=r.totalDiluent||0; });
-    var dL=(n.dmso&&n.dmso.load)||0, tL=(n.tween&&n.tween.load)||0;
+    // Chaque protocole apporte SA normalisation x SES exemplaires
+    var _nl=runNormLoads(), dL=_nl.dmso, tL=_nl.tween;
     if(dL<=0 && tL<=0 && dmsoDil<=0 && twDil<=0) return "";
-    var plates=Math.max(1,Number(prep.plates)||1); dL=dL*plates; tL=tL*plates; // X runs → X× the backfill vehicle
     var en=(curLang()==="en");
     // Cartes de vehicules, alignees sur le style des cartes de drogues
     function row(label, normLoad, dil, accent){
@@ -15089,6 +15464,9 @@ function deleteLiveZone(freezerId, zoneId){
       var ae=document.getElementById("p-btnAllowExp");
       if(ae) ae.onclick=function(){ prep.allowExpired=true; renderResults(); }; }
     var gb=document.getElementById("p-grab"); if(gb){ gb.innerHTML=grabHTML(valid);
+      // Badge « rediluer » : ouvre la recette de CE produit (sans cocher la ligne)
+      gb.querySelectorAll("[data-redil]").forEach(function(b){
+        b.addEventListener("click", function(e){ e.stopPropagation(); openRedilEditor(b.getAttribute("data-redil")); }); });
       // Nombre de tubes : ajustement manuel (prime sur le calcul)
       function tubeKeyOf(gid){ return normDrug(String(gid).replace(/^g-/,"")); }
       function curTubes(gid){
@@ -15328,17 +15706,54 @@ function deleteLiveZone(freezerId, zoneId){
   }
 
   function renderPrepTab(c){
+    // Amorcage des recettes de re-dilution : la fonction existait mais n'etait
+    // appelee nulle part, donc les cinq recettes pre-reglees n'apparaissaient
+    // jamais. Fait ici plutot qu'au demarrage : rien n'est ecrit tant que
+    // l'onglet Prepa n'est pas ouvert.
+    try{ seedRedilRecipesOnce(); }catch(e){}
     var h='<div class="p-wrap"><datalist id="p-druglist"></datalist>';
     h+='<div class="p-head"><div class="p-title">'+L("titleMain")+(L("titleSub")?'<small>'+L("titleSub")+'</small>':'')+'</div><div class="p-spacer"></div>';
-    h+='<div class="p-ctl"><label>'+L("plates")+'</label><div class="p-stepper"><button id="p-pdec">−</button><input id="p-pval" type="text" inputmode="numeric" pattern="[0-9]*" value="'+(Number(prep.plates)||1)+'"><button id="p-pinc">+</button></div></div>';
+    // Plusieurs protocoles : les exemplaires se reglent sur chacun (bandeau
+    // ci-dessous) ; le reglage global n'aurait plus de sens et n'est pas affiche.
+    var _nsrc=ensureSources().length;
+    if(_nsrc<=1) h+='<div class="p-ctl"><label>'+L("plates")+'</label><div class="p-stepper"><button id="p-pdec">−</button><input id="p-pval" type="text" inputmode="numeric" pattern="[0-9]*" value="'+(_nsrc===1?prep.sources[0].copies:(Number(prep.plates)||1))+'"><button id="p-pinc">+</button></div></div>';
     h+='<div class="p-ctl"><label>'+L("dilution")+'</label><div class="p-seg" id="p-modeseg"><button data-mode="serial" class="'+(prep.mode==="serial"?"on":"")+'">'+L("serial")+'</button><button data-mode="direct" class="'+(prep.mode==="direct"?"on":"")+'">'+L("direct")+'</button></div></div>';
 
     h+='</div>';
 
+    // ===== Bandeau « Protocoles du run » : visible, hors du panneau repliable =====
+    (function(){
+      var en=(lang==="en"), srcs=ensureSources(), mem=tddFiles(), nRd=Object.keys(redilRecipes()).length;
+      h+='<div class="p-runsrcs" id="p-runsrcs">';
+      h+='<div class="prs-h">'+(en?"Protocols in this run":"Protocoles du run")+'</div>';
+      h+='<div class="prs-list">';
+      srcs.forEach(function(s){
+        h+='<div class="prs-card" data-src="'+esc(s.id)+'">'
+          +'<div class="prs-txt"><div class="prs-name" title="'+esc(s.name)+'">'+esc(s.name)+'</div>'
+          +'<div class="prs-sub">'+s.n+' '+(en?"fluids":"fluides")+'</div></div>'
+          +(srcs.length>1
+             ? '<div class="prs-copies"><button class="prs-step" data-srcdec="'+esc(s.id)+'" title="'+(en?"one copy less":"un exemplaire de moins")+'">\u2212</button>'
+               +'<b>\u00d7'+s.copies+'</b>'
+               +'<button class="prs-step" data-srcinc="'+esc(s.id)+'" title="'+(en?"one copy more":"un exemplaire de plus")+'">+</button></div>'
+             : '')
+          +'<button class="prs-del" data-srcrm="'+esc(s.id)+'" title="'+(en?"Remove from this run":"Retirer du run")+'">\u00d7</button>'
+        +'</div>';
+      });
+      if(!srcs.length) h+='<div class="prs-empty">'+(en?"No protocol loaded yet.":"Aucun protocole chargé.")+'</div>';
+      h+='</div>';
+      if(legacyNormNote()) h+='<div class="prs-warn">'+(en
+        ?"These protocols were loaded by an older version: copies apply to the drugs, but DMSO / buffer-Tween cannot be split between them. Re-import the .tdd files to fix it."
+        :"Ces protocoles ont été chargés par une version précédente : les exemplaires s'appliquent aux drogues, mais le DMSO / tampon-Tween ne peut pas être réparti entre eux. Réimporte les .tdd pour corriger.")+'</div>';
+      h+='<div class="prs-btns">';
+      if(mem.length) h+='<button class="p-btn" id="p-tddmem">'+(en?"My protocols":"Mes protocoles")+' <span class="prs-count">'+mem.length+'</span></button>';
+      h+='<button class="p-btn" id="p-redil">'+(en?"Pre-dilutions":"Re-dilutions")+(nRd?' <span class="prs-count">'+nRd+'</span>':'')+'</button>';
+      h+='</div>';
+      h+='</div>';
+    })();
     h+='<div class="p-panel" id="p-panel"><div class="p-panel-head" id="p-panelhead"><span class="p-caret">▶</span><span class="p-ph-ic">⇢</span><span class="p-ph-title">'+L("panelTitle")+'</span><span class="p-ph-sub" id="p-panelsub">'+LF("panelSub",{n:prep.fluids.length})+'</span></div>';
     h+='<div class="p-panel-body">';
     h+='<div class="p-row"><button class="p-btn primary" id="p-tdd">'+(lang==="en"?"Import .tdd":"Importer .tdd")+'</button><button class="p-btn" id="p-tddadd">+ '+(lang==="en"?"Add a .tdd":"Ajouter un .tdd")+'</button><input type="file" id="p-tddfile" accept=".tdd,.xml" style="display:none"><button class="p-btn" id="p-clear">'+L("clear")+'</button><span class="p-spacer"></span><button class="p-btn" id="p-share" title="'+(lang==="en"?"Share this prep with the team (visible on your other machines)":"Partager cette prépa avec l\'équipe (visible sur tes autres postes)")+'">'+(lang==="en"?"Share":"Partager")+'</button><button class="p-btn" id="p-getshared" title="'+(lang==="en"?"Load the prep shared by the team":"Charger la prépa partagée")+'">'+(lang==="en"?"Retrieve":"Récupérer")+'</button><span class="p-note" id="p-parsenote"></span></div>';
-    if((prep.sources||[]).length) h+='<div class="p-srcs">'+prep.sources.map(function(s,i){ return '<span class="p-src">'+esc(s.name)+' <small>'+s.n+'</small><b data-srcdel="'+i+'" title="'+(lang==="en"?"Remove this protocol":"Retirer ce protocole")+'">×</b></span>'; }).join("")+'</div>';
+
     h+='<div style="max-width:580px;overflow-x:auto"><table class="p-grid"><thead><tr><th>'+L("thDrug")+'</th><th>'+L("thDil")+'</th><th title="'+(lang==="en"?"D300e load — exact volume to load into the dispenser cassette for this fluid (from the .tdd). Fixed by the protocol; the margin does not change it (the margin adds extra to the dilution volumes you prepare).":"Charge D300e — volume exact à charger dans la cassette du dispenseur pour ce fluide (calculé depuis le .tdd). Fixé par le protocole ; la marge ne le change pas (la marge ajoute du volume aux dilutions à préparer).")+'">'+L("thVol")+'</th><th></th></tr></thead><tbody id="p-fluidBody">'+fluidRowsHTML()+'</tbody></table><button class="p-add" id="p-addfluid">'+L("addFluid")+'</button></div>';
     h+='<div class="p-adv"><div class="p-ctl"><label>'+L("margin")+'</label><input class="p-in xs" id="p-exc" type="number" min="0" step="5" value="'+nv(prep.excess)+'"></div><div class="p-ctl" title="'+(lang==="en"?"Max volume prepared in one dilution tube. A dilution too steep for a single step is split into several gentler steps (more tubes, but more reliable pipetting).":"Volume max préparé dans un seul tube de dilution. Une dilution trop forte pour un seul palier est fractionnée en plusieurs paliers plus doux (plus de tubes, mais prélèvements plus fiables).")+'"><label>'+L("minPrep")+'</label><input class="p-in xs" id="p-mp" type="number" min="0" step="5" value="'+nv(prep.maxPrep)+'"></div><div class="p-ctl"><label>'+L("minPip")+'</label><input class="p-in xs" id="p-mpip" type="number" min="0" step="0.5" value="'+nv(prep.minPip)+'"></div><div class="p-ctl" title="'+(lang==="en"?"Default volume to prepare for a dilution when none is given. Ignored on .tdd import — each fluid already carries its computed volume.":"Volume par défaut à préparer pour une dilution quand aucun volume n’est indiqué. Ignoré à l’import .tdd — chaque fluide y a déjà son volume calculé.")+'"><label>'+(lang==="en"?"µL / dilution":"µL / dilution")+'</label><input class="p-in xs" id="p-load" type="number" min="0" step="5" value="'+nv(prep.load)+'"></div></div>';
     h+='</div></div>';
@@ -15346,10 +15761,15 @@ function deleteLiveZone(freezerId, zoneId){
     h+='<div id="p-normtop"></div><div id="p-grab"></div><div id="p-norm" hidden></div><div id="p-validate"></div><div id="p-recipes"></div></div>';
     c.innerHTML=h;
 
-    function setPlates(v){ prep.plates=Math.max(1,Math.round(Number(v)||1)); var el=document.getElementById("p-pval"); if(el) el.value=prep.plates; savePrep(); renderResults(); }
-    document.getElementById("p-pdec").onclick=function(){ setPlates(prep.plates-1); };
-    document.getElementById("p-pinc").onclick=function(){ setPlates(prep.plates+1); };
-    document.getElementById("p-pval").addEventListener("input",function(e){ prep.plates=Math.max(1,Math.round(Number(e.target.value)||1)); savePrep(); renderResultsSoon(); });
+    // Un seul protocole : le reglage d'en-tete EST celui de ce protocole.
+    function curCopies(){ var l=ensureSources(); return l.length===1?l[0].copies:Math.max(1,Number(prep.plates)||1); }
+    function setPlates(v){ v=Math.max(1,Math.min(99,Math.round(Number(v)||1)));
+      var l=ensureSources(); if(l.length===1) l[0].copies=v;
+      prep.plates=v; var el=document.getElementById("p-pval"); if(el) el.value=v; savePrep(); renderResults(); }
+    var _pd=document.getElementById("p-pdec"), _pi=document.getElementById("p-pinc"), _pv=document.getElementById("p-pval");
+    if(_pd) _pd.onclick=function(){ setPlates(curCopies()-1); };
+    if(_pi) _pi.onclick=function(){ setPlates(curCopies()+1); };
+    if(_pv) _pv.addEventListener("input",function(e){ var v=Math.max(1,Math.round(Number(e.target.value)||1)); var l=ensureSources(); if(l.length===1) l[0].copies=v; prep.plates=v; savePrep(); renderResultsSoon(); });
     document.getElementById("p-modeseg").querySelectorAll("button").forEach(function(b){ b.onclick=function(){ prep.mode=b.getAttribute("data-mode"); document.getElementById("p-modeseg").querySelectorAll("button").forEach(function(x){x.classList.toggle("on",x.getAttribute("data-mode")===prep.mode);}); savePrep(); renderResults(); }; });
     document.getElementById("p-exc").addEventListener("input",function(e){ prep.excess=e.target.value; savePrep(); renderResultsSoon(); });
     document.getElementById("p-mp").addEventListener("input",function(e){ prep.maxPrep=e.target.value; savePrep(); renderResultsSoon(); });
@@ -15361,6 +15781,18 @@ function deleteLiveZone(freezerId, zoneId){
     (function(){ var tb=document.getElementById("p-tdd"), ta=document.getElementById("p-tddadd"), tf=document.getElementById("p-tddfile");
       var sh=document.getElementById("p-share"); if(sh) sh.onclick=sharePrep;
       var gs=document.getElementById("p-getshared"); if(gs) gs.onclick=loadSharedPrep;
+      // ---- Bandeau des protocoles : exemplaires, retrait, memoire ----
+      var rs=document.getElementById("p-runsrcs");
+      if(rs) rs.addEventListener("click", function(ev){
+        var t=ev.target.closest("[data-srcinc],[data-srcdec],[data-srcrm]"); if(!t) return;
+        ev.preventDefault(); ev.stopPropagation();
+        var inc=t.getAttribute("data-srcinc"), dec=t.getAttribute("data-srcdec"), rm=t.getAttribute("data-srcrm");
+        if(inc||dec){ var s=srcById(inc||dec); if(!s) return;
+          setSrcCopies(s.id, s.copies+(inc?1:-1)); renderPrepTab(document.getElementById("canvas")); return; }
+        if(rm){ removeSourceFromRun(rm); refillFluids(); renderPrepTab(document.getElementById("canvas")); }
+      });
+      var mb=document.getElementById("p-tddmem"); if(mb) mb.onclick=openTddMemory;
+      var rb=document.getElementById("p-redil"); if(rb) rb.onclick=function(){ openRedilEditor(); };
       // Delegation : le clic est capte sur le conteneur, donc insensible aux re-rendus
       var srcsBox=document.querySelector(".p-srcs");
       if(srcsBox) srcsBox.addEventListener("click", function(ev){
@@ -15383,30 +15815,16 @@ function deleteLiveZone(freezerId, zoneId){
       });
       if(ta&&tf) ta.onclick=function(){ tf.setAttribute("data-mode","add"); tf.click(); };
       if(tb&&tf){ tb.onclick=function(){ tf.setAttribute("data-mode","replace"); tf.click(); }; tf.onchange=function(e){ var file=e.target.files&&e.target.files[0]; if(!file) return; var rd=new FileReader(); rd.onload=function(ev){ var parsed=parseTdd(String(ev.target.result||"")); var note=document.getElementById("p-parsenote"); if(!parsed||!parsed.length){ PREP_NOTE={cls:"p-note err",txt:(lang==="en"?"Unreadable .tdd file":"Fichier .tdd illisible")}; showPrepNote(); return; } var addMode = (tf.getAttribute("data-mode")==="add") && prep.fluids.length>0;
-        var srcName = file.name || (lang==="en"?"protocol":"protocole");
-        var srcId="s"+Date.now()+Math.floor(Math.random()*1000);
-        parsed.forEach(function(f){ f.src=srcName; f.srcId=srcId; });
-        if(addMode){
-          prep.fluids = prep.fluids.concat(parsed);
-          // chaque run charge sa propre normalisation : on cumule
-          if(parsed.norm){
-            if(!prep.norm) prep.norm=parsed.norm;
-            else {
-              prep.norm={ dmso:{disp:(prep.norm.dmso.disp||0)+(parsed.norm.dmso.disp||0), load:(prep.norm.dmso.load||0)+(parsed.norm.dmso.load||0)},
-                          tween:{disp:(prep.norm.tween.disp||0)+(parsed.norm.tween.disp||0), load:(prep.norm.tween.load||0)+(parsed.norm.tween.load||0)},
-                          plates:(prep.norm.plates||0)+(parsed.norm.plates||0) };
-            }
-          }
-          prep.sources=(prep.sources||[]).concat([{name:srcName,n:parsed.length,id:srcId}]);
-        } else {
-          prep.fluids=parsed; prep.norm=parsed.norm||null; prep.plates=1; prep.mode="serial";
-          prep.excess=10; prep.minPip=1; prep.sources=[{name:srcName,n:parsed.length,id:srcId}];
-        }
-        prep.excluded={}; savePrep(); refillFluids(); renderResults();
-        // La pastille du protocole vit dans renderPrepTab : sans ce rendu, le
-        // .tdd importe restait sans etiquette et son bouton de retrait etait
-        // inaccessible jusqu'a un changement d'onglet.
-        setTimeout(function(){ try{ renderPrepTab(document.getElementById("canvas")); }catch(e){} }, 0);
+        var srcName = (file.name || (lang==="en"?"protocol":"protocole")).replace(/\.(tdd|xml)$/i,"");
+        // Retenu en memoire : reutilisable plus tard sans rouvrir le fichier
+        rememberTdd(srcName, parsed, parsed.norm||null);
+        if(!addMode){ prep.mode="serial"; prep.excess=10; prep.minPip=1; }
+        addSourceToRun(srcName, parsed, parsed.norm||null, !addMode);
+        // Reconstruction IMMEDIATE de l'onglet (le bandeau des protocoles en fait
+        // partie). En differe, il existait un instant ou la prepa etait a jour
+        // mais le bandeau montrait encore l'ancien etat. La note d'import est
+        // posee juste apres et s'affiche dans le nouveau DOM.
+        try{ renderPrepTab(document.getElementById("canvas")); }catch(e){}
         var _ex=document.getElementById("p-exc"); if(_ex) _ex.value=prep.excess; var _mp=document.getElementById("p-mpip"); if(_mp) _mp.value=prep.minPip; var _pv=document.getElementById("p-pval"); if(_pv) _pv.value=prep.plates; var un=parsed.unsupported||[];
         if(un.length){ PREP_NOTE={cls:"p-note err",
           txt:(lang==="en"?"\u26a0 "+un.length+" fluid(s) IGNORED (unsupported): ":"\u26a0 "+un.length+" fluide(s) IGNORÉ(S) (non géré) : ")
