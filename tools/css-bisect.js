@@ -132,7 +132,18 @@ const construire = (src, plages, retirer) => {
     return (await chercher(idx.slice(0, m))).concat(await chercher(idx.slice(m)));
   }
 
-  const gardables = await chercher(plages.map((_, k) => k));
+  /* `chercher` valide chaque moitié SÉPARÉMENT : deux retraits inoffensifs
+     isolément peuvent se combiner en une régression. L'union doit donc être
+     éprouvée à son tour, et la recherche reprise tant qu'elle ne tient pas.
+     Sans ce tour de contrôle, un décalage de la section « Préparer les
+     dilutions » est passé au travers. */
+  let gardables = plages.map((_, k) => k);
+  for (let tour = 1; ; tour++) {
+    gardables = await chercher(gardables);
+    if (!gardables.length) break;
+    console.log('  — tour ' + tour + ' : vérification de l’union des ' + gardables.length + ' retraits');
+    if (await passe(gardables)) break;
+  }
   await browser.close();
 
   console.log('\n' + gardables.length + ' / ' + plages.length + ' `!important` retirables sans le moindre écart');

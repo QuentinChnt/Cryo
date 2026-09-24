@@ -46,6 +46,39 @@ const ETATS = {
                          cmPalette('a'); },
   toasts:        () => { const v=document.getElementById('cmkVeil'); if(v) v.click();
                          toast('message','success',60000); toast('alerte','danger',60000); },
+
+  /* L'onglet Prépa VIDE ne rend ni les cartes « À sortir », ni la section
+     « Préparer les dilutions » : ces états-là n'étaient donc jamais mesurés.
+     C'est exactement par là qu'une régression est passée. */
+  prepaChargee:  () => { document.querySelectorAll('.modal-backdrop.show').forEach(m=>m.classList.remove('show'));
+                         view.tab='prep'; render();
+                         window.__prepRestore({ plates:2, mode:'serial', excess:10, minPrep:20, maxPrep:50,
+                           minPip:1, load:2, tubesOv:{}, norm:{dmso:{disp:120,load:99},tween:{disp:20,load:14},plates:2},
+                           sources:[], checks:{}, excluded:{}, spotChoice:{}, linkChoice:{},
+                           fluids:[{drug:'Docetaxel',dil:'mère',load:50},
+                                   {drug:'Docetaxel',dil:'1:4',load:50},
+                                   {drug:'Docetaxel',dil:'1:16',load:50},
+                                   {drug:'Docetaxel',dil:'1:64',load:50},
+                                   {drug:'Paclitaxel',dil:'mère',load:30},
+                                   {drug:'Paclitaxel',dil:'1:10',load:30},
+                                   {drug:'Olaparib',dil:'mère',load:20}] });
+                         renderPrepTab(document.getElementById('canvas')); },
+
+  /* Un nom rapproché par approximation : badge « ≈ », bouton de confirmation
+     et bandeau de validation bloqué. */
+  prepaApproche: () => { window.__prepRestore({ plates:1, mode:'serial', excess:10, minPrep:20, maxPrep:50,
+                           minPip:1, load:2, tubesOv:{}, norm:null, sources:[], checks:{}, excluded:{},
+                           spotChoice:{}, linkChoice:{},
+                           fluids:[{drug:'Docetaxol',dil:'mère',load:50}] });
+                         renderPrepTab(document.getElementById('canvas')); },
+
+  /* Stock insuffisant + cases cochées : les variantes d'état des cartes. */
+  prepaCochee:   () => { window.__prepRestore({ plates:9, mode:'serial', excess:10, minPrep:20, maxPrep:50,
+                           minPip:1, load:2, tubesOv:{}, norm:null, sources:[], checks:{'g-0':true},
+                           excluded:{}, spotChoice:{}, linkChoice:{},
+                           fluids:[{drug:'Docetaxel',dil:'mère',load:400},
+                                   {drug:'Paclitaxel',dil:'1:4',load:400}] });
+                         renderPrepTab(document.getElementById('canvas')); },
 };
 const LARGEURS = [1440, 880, 420];
 
@@ -96,7 +129,7 @@ async function releve(browser, fichier, props) {
     if (!props) props = await page.evaluate(() => window.__props);
     for (const [nom, fn] of Object.entries(ETATS)) {
       await page.evaluate(fn);
-      await page.waitForTimeout(260);
+      await page.waitForTimeout(nom.startsWith('prepa') ? 700 : 260);
       out[nom + '@' + w] = await page.evaluate(() => window.__empreinte());
     }
     await ctx.close();

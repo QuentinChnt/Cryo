@@ -58,6 +58,27 @@ const VUES = {
   preferences:  () => { view.tab='map'; view.level='overview'; render();
                         document.getElementById('searchResults').classList.remove('show');
                         document.getElementById('btnConfig').click(); },
+  /* L'onglet Prépa VIDE ne montre ni les cartes « À sortir » ni la section
+     « Préparer les dilutions ». C'est par ce trou de couverture qu'une
+     régression est passée : on photographie donc un run chargé. */
+  prepaChargee: () => { document.querySelectorAll('.modal-backdrop.show').forEach(m=>m.classList.remove('show'));
+                        view.tab='prep'; render();
+                        window.__prepRestore({ plates:2, mode:'serial', excess:10, minPrep:20, maxPrep:50,
+                          minPip:1, load:2, tubesOv:{}, norm:{dmso:{disp:120,load:99},tween:{disp:20,load:14},plates:2},
+                          sources:[], checks:{}, excluded:{}, spotChoice:{}, linkChoice:{},
+                          fluids:[{drug:'Docetaxel',dil:'mère',load:50},
+                                  {drug:'Docetaxel',dil:'1:4',load:50},
+                                  {drug:'Docetaxel',dil:'1:16',load:50},
+                                  {drug:'Docetaxel',dil:'1:64',load:50},
+                                  {drug:'Paclitaxel',dil:'mère',load:30},
+                                  {drug:'Paclitaxel',dil:'1:10',load:30},
+                                  {drug:'Olaparib',dil:'mère',load:20}] });
+                        renderPrepTab(document.getElementById('canvas')); },
+  prepaApproche:() => { window.__prepRestore({ plates:1, mode:'serial', excess:10, minPrep:20, maxPrep:50,
+                          minPip:1, load:2, tubesOv:{}, norm:null, sources:[], checks:{}, excluded:{},
+                          spotChoice:{}, linkChoice:{},
+                          fluids:[{drug:'Docetaxol',dil:'mère',load:50}] });
+                        renderPrepTab(document.getElementById('canvas')); },
 };
 
 (async () => {
@@ -73,7 +94,7 @@ const VUES = {
     await page.evaluate(SEED);
     for (const [nom, fn] of Object.entries(VUES)) {
       await page.evaluate(fn);
-      await page.waitForTimeout(450);
+      await page.waitForTimeout(nom.startsWith('prepa') ? 900 : 450);
       await page.screenshot({ path: path.join(OUT, nom + '-' + t.n + '.png'), fullPage: true });
       // on referme ce qui a pu s'ouvrir, pour que la vue suivante parte propre
       await page.evaluate(() => { document.querySelectorAll('.modal-backdrop.show')
