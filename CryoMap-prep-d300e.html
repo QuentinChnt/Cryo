@@ -4957,10 +4957,16 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 .rd-row.focus .rd-name{border-color:var(--accent);box-shadow:0 0 0 2px var(--ok-soft)}
 /* Ce que le run demande vraiment, sous la recette d'un lot. La recette est un
    modele ; ces chiffres-la suivent le nombre d'exemplaires du protocole. */
-.rd-run{grid-column:1/-1;margin-top:2px;padding:6px 9px;border-radius:var(--r-xs);
-  background:var(--ok-soft);font-size:11.5px;color:var(--ink-3);line-height:1.45}
-.rd-run b{font-family:var(--mono);color:var(--ink-1);font-weight:700}
-.rd-run-k{font-weight:700;color:var(--ink-2);margin-right:6px}
+.rd-run{grid-column:1/-1;display:grid;align-items:center;
+  grid-template-columns:minmax(120px,1.6fr) repeat(4,minmax(64px,1fr)) minmax(84px,1fr) 24px;
+  gap:8px;margin-top:3px;padding:5px 0 5px 9px;border-radius:var(--r-xs);
+  background:var(--ok-soft);font-size:12px;color:var(--ink-2)}
+.rd-run-k{font-family:var(--mono);font-weight:700;font-size:12.5px;color:var(--ink-1)}
+.rd-run-k em{font-style:normal;font-weight:600;font-size:11px;color:var(--ink-3)}
+.rd-run-v{font-family:var(--mono);font-weight:700;color:var(--ink-1)}
+.rd-run-v small{font-family:var(--mono);font-weight:400;font-size:10.5px;color:var(--ink-4)}
+.rd-run-v.dash{color:var(--ink-4);font-weight:400}
+.rd-run-v.total{color:var(--accent-ink)}
 .rd-empty{font-size:12.5px;color:var(--ink-3);margin:8px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rd-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
 #sidePanelModal .modal{max-width:760px!important}
@@ -15065,16 +15071,27 @@ function deleteLiveZone(freezerId, zoneId){
       if(!(c.fv>0) || !(dv>0)) return null;          // recette incomplete
       var lots=Math.max(1, Math.ceil(v/c.fv));
       return {besoin:v, lots:lots, stock:lots*dv,
+              pbs:lots*(num(r.p)||0), tween:lots*(num(r.t)||0),
               diluant:lots*((num(r.p)||0)+(num(r.t)||0)), total:lots*c.fv};
     }
+    /* Les quantites a preparer, alignees SOUS les colonnes de la recette : la
+       recette reste celle d'un lot (modifiable), la ligne du dessous donne ce
+       qu'il faut reellement sortir pour ce run. Doubler le protocole double
+       ces chiffres-la, pas la recette. */
     function runHTML(r){
       var q=pourLeRun(r);
       if(!q) return '';
-      return '<div class="rd-run"><span class="rd-run-k">'+(en?"For this run":"Pour ce run")+'</span>'
-        + fmt(q.besoin)+' µL '+(en?"of working solution":"de solution de travail")
-        + ' \u2192 <b>'+q.lots+' '+(en?(q.lots>1?"batches":"batch"):(q.lots>1?"lots":"lot"))+'</b> · '
-        + '<b>'+fmt(q.stock)+' µL</b> '+(en?"of stock":"de stock")+' + <b>'+fmt(q.diluant)+' µL</b> '
-        + (en?"of diluent":"de diluant")+' = <b>'+fmt(q.total)+' µL</b></div>';
+      var mL=' <small>µL</small>';
+      return '<div class="rd-run" title="'+esc(en
+          ? (q.lots+' batch(es) of '+fmt(num(r.d))+' µL drawn — the run needs '+fmt(q.besoin)+' µL of working solution')
+          : (q.lots+' lot(s) de '+fmt(num(r.d))+' µL prélevés — le run demande '+fmt(q.besoin)+' µL de solution de travail'))+'">'
+        + '<span class="rd-run-k">\u00d7'+q.lots+' <em>'+(en?(q.lots>1?"batches":"batch"):(q.lots>1?"lots":"lot"))+'</em></span>'
+        + '<span class="rd-run-v dash">—</span>'
+        + '<span class="rd-run-v">'+fmt(q.stock)+mL+'</span>'
+        + '<span class="rd-run-v">'+fmt(q.pbs)+mL+'</span>'
+        + '<span class="rd-run-v">'+fmt(q.tween)+mL+'</span>'
+        + '<span class="rd-run-v total">'+fmt(q.total)+mL+'</span>'
+        + '<span></span></div>';
     }
     function paint(){
       var h='<div class="rd-hint">'+(en

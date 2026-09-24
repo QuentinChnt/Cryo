@@ -1016,11 +1016,11 @@ const SEED = `(() => {
     });
     check('re-dilutions : la fenêtre ne montre le run que pour les produits chargés',
       panneau.un.length === 1 && panneau.un[0].nom === 'Docetaxel', panneau);
-    check('re-dilutions : la fenêtre chiffre les lots et volumes du run, exemplaires compris',
-      /1 lot\b/.test(panneau.un[0].run || '') && /10 µL de stock/.test(panneau.un[0].run || '')
-      && /70 µL de diluant/.test(panneau.un[0].run || '') && /= 80 µL/.test(panneau.un[0].run || '')
-      && /2 lots/.test((panneau.deux[0]||{}).run || '') && /20 µL de stock/.test((panneau.deux[0]||{}).run || '')
-      && /140 µL de diluant/.test((panneau.deux[0]||{}).run || '') && /= 160 µL/.test((panneau.deux[0]||{}).run || ''),
+    // Recette d'un lot : 10 / 67.6 / 2.4 -> 80 µL. Doubler le protocole doit
+    // afficher, sous chaque colonne, exactement le double.
+    check('re-dilutions : la fenêtre chiffre le run sous chaque colonne, exemplaires compris',
+      (panneau.un[0].run || '') === '×1 lot—10 µL67.6 µL2.4 µL80 µL'
+      && ((panneau.deux[0]||{}).run || '') === '×2 lots—20 µL135.2 µL4.8 µL160 µL',
       panneau);
     await page.context().close();
   }
