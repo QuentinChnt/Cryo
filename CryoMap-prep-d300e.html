@@ -4955,6 +4955,12 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 .rd-del{border:none;background:none;color:var(--ink-4);cursor:pointer;font-size:15px}
 .rd-del:hover{color:var(--danger)}
 .rd-row.focus .rd-name{border-color:var(--accent);box-shadow:0 0 0 2px var(--ok-soft)}
+/* Ce que le run demande vraiment, sous la recette d'un lot. La recette est un
+   modele ; ces chiffres-la suivent le nombre d'exemplaires du protocole. */
+.rd-run{grid-column:1/-1;margin-top:2px;padding:6px 9px;border-radius:var(--r-xs);
+  background:var(--ok-soft);font-size:11.5px;color:var(--ink-3);line-height:1.45}
+.rd-run b{font-family:var(--mono);color:var(--ink-1);font-weight:700}
+.rd-run-k{font-weight:700;color:var(--ink-2);margin-right:6px}
 .rd-empty{font-size:12.5px;color:var(--ink-3);margin:8px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rd-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
 #sidePanelModal .modal{max-width:760px!important}
@@ -15044,6 +15050,32 @@ function deleteLiveZone(freezerId, zoneId){
     function num(v){ return (v===""||v==null||!isFinite(Number(v)))?null:Number(v); }
     function computed(r){ var fv=(num(r.d)||0)+(num(r.p)||0)+(num(r.t)||0);
       var fc=(fv>0&&num(r.sc)!=null)?num(r.sc)*(num(r.d)||0)/fv:null; return {fv:fv, fc:fc}; }
+
+    /* Volume de solution de travail que le run reclame, drogue par drogue.
+       Il porte deja les exemplaires du protocole : doubler un .tdd double ce
+       volume, donc le nombre de lots et les quantites a preparer. C'est ce que
+       la fenetre doit montrer — la recette, elle, reste celle d'UN lot. */
+    var besoin={};
+    try{ groupResults().forEach(function(g){
+      if(g && g.mother && g.mother.used>0) besoin[normDrug(g.name)]=g.mother.used; }); }catch(e){}
+    function pourLeRun(r){
+      var v=besoin[normDrug(r.name||"")];
+      if(!(v>0)) return null;                       // cette drogue n'est pas dans le run
+      var c=computed(r), dv=num(r.d);
+      if(!(c.fv>0) || !(dv>0)) return null;          // recette incomplete
+      var lots=Math.max(1, Math.ceil(v/c.fv));
+      return {besoin:v, lots:lots, stock:lots*dv,
+              diluant:lots*((num(r.p)||0)+(num(r.t)||0)), total:lots*c.fv};
+    }
+    function runHTML(r){
+      var q=pourLeRun(r);
+      if(!q) return '';
+      return '<div class="rd-run"><span class="rd-run-k">'+(en?"For this run":"Pour ce run")+'</span>'
+        + fmt(q.besoin)+' µL '+(en?"of working solution":"de solution de travail")
+        + ' \u2192 <b>'+q.lots+' '+(en?(q.lots>1?"batches":"batch"):(q.lots>1?"lots":"lot"))+'</b> · '
+        + '<b>'+fmt(q.stock)+' µL</b> '+(en?"of stock":"de stock")+' + <b>'+fmt(q.diluant)+' µL</b> '
+        + (en?"of diluent":"de diluant")+' = <b>'+fmt(q.total)+' µL</b></div>';
+    }
     function paint(){
       var h='<div class="rd-hint">'+(en
         ?'For products you dilute by hand before loading them. The number of tubes to pull is then computed on the <b>stock</b> actually used.'
@@ -15059,7 +15091,8 @@ function deleteLiveZone(freezerId, zoneId){
           +'<span class="rd-cell"><input class="form-input rd-n" data-f="p" value="'+(r.p==null?"":r.p)+'" inputmode="decimal"><small>µL</small></span>'
           +'<span class="rd-cell"><input class="form-input rd-n" data-f="t" value="'+(r.t==null?"":r.t)+'" inputmode="decimal"><small>µL</small></span>'
           +'<span class="rd-out"><b>'+(c.fv>0?fmt(c.fv):"—")+'</b> µL'+(c.fc!=null?'<small>'+fmt(Math.round(c.fc*100)/100)+' '+esc(r.u)+'</small>':'')+'</span>'
-          +'<button class="rd-del" data-del="'+i+'" title="'+(en?"Remove":"Supprimer")+'">\u00d7</button></div>';
+          +'<button class="rd-del" data-del="'+i+'" title="'+(en?"Remove":"Supprimer")+'">\u00d7</button>'
+          + runHTML(r) + '</div>';
       });
       h+='</div>';
       if(!rows.length) h+='<div class="rd-empty">'+(en?"No pre-dilution yet.":"Aucune re-dilution pour l'instant.")
@@ -15074,8 +15107,17 @@ function deleteLiveZone(freezerId, zoneId){
         rowEl.querySelectorAll(".rd-n").forEach(function(inp){ inp.oninput=function(e){
           rows[i][inp.getAttribute("data-f")]=e.target.value.replace(",",".");
           var c=computed(rows[i]); rowEl.querySelector(".rd-out").innerHTML='<b>'+(c.fv>0?fmt(c.fv):"—")+'</b> µL'
-            +(c.fc!=null?'<small>'+fmt(Math.round(c.fc*100)/100)+' '+esc(rows[i].u)+'</small>':''); }; });
+            +(c.fc!=null?'<small>'+fmt(Math.round(c.fc*100)/100)+' '+esc(rows[i].u)+'</small>':'');
+          majRun(rowEl, rows[i]); }; });
+        rowEl.querySelector(".rd-name").addEventListener("input", function(){ majRun(rowEl, rows[i]); });
       });
+      /* La ligne « pour ce run » suit la saisie : changer le volume prélevé
+         ou le diluant recalcule immédiatement les quantités du run. */
+      function majRun(rowEl, r){
+        var old=rowEl.querySelector(".rd-run"), neuf=runHTML(r);
+        if(old) old.remove();
+        if(neuf) rowEl.insertAdjacentHTML("beforeend", neuf);
+      }
       body.querySelectorAll("[data-del]").forEach(function(b){ b.onclick=function(){ rows.splice(+b.getAttribute("data-del"),1); paint(); }; });
       var sd=document.getElementById("rd-seed"); if(sd) sd.onclick=function(){
         [["Zolbetuximab",20,10,67.6,2.4],["ASP546C",20,10,67.6,2.4],["control_dar8",7,28.6,49,2.4],

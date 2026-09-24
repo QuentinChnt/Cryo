@@ -991,6 +991,37 @@ const SEED = `(() => {
       /10 µL stock/.test(dbl.un || '') && /70 µL diluant/.test(dbl.un || '') && /80 µL/.test(dbl.un || '')
       && /20 µL stock/.test(dbl.deux || '') && /140 µL diluant/.test(dbl.deux || '') && /160 µL/.test(dbl.deux || ''),
       dbl);
+
+    /* La fenêtre « Re-dilutions » édite une recette d'UN lot. Elle doit dire, à
+       côté, ce que le run réclame vraiment — nombre de lots et volumes totaux,
+       exemplaires compris. */
+    const panneau = await page.evaluate(async () => {
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      const lire = async copies => {
+        window.__prepRestore({ plates:1, mode:'serial', excess:10, minPrep:20, maxPrep:50, minPip:1,
+          load:2, tubesOv:{}, norm:null, checks:{}, excluded:{}, spotChoice:{}, linkChoice:{},
+          sources:[{ id:'s1', name:'astellas.tdd', n:1, copies:copies, norm:null }],
+          fluids:[{ drug:'Docetaxel', dil:'mère', load:50, src:'astellas.tdd', srcId:'s1' }] });
+        renderPrepTab(document.getElementById('canvas'));
+        await new Promise(r => setTimeout(r, 700));
+        const b = document.querySelector('#p-grab .p-redil-badge'); if (b) b.click();
+        await new Promise(r => setTimeout(r, 500));
+        const lignes = Array.from(document.querySelectorAll('#sidePanelModal .rd-row'))
+          .map(r => ({ nom:(r.querySelector('.rd-name')||{}).value, run:T(r.querySelector('.rd-run')) }))
+          .filter(x => x.run);
+        document.querySelectorAll('#sidePanelModal').forEach(m => m.classList.remove('show'));
+        return lignes;
+      };
+      return { un: await lire(1), deux: await lire(2) };
+    });
+    check('re-dilutions : la fenêtre ne montre le run que pour les produits chargés',
+      panneau.un.length === 1 && panneau.un[0].nom === 'Docetaxel', panneau);
+    check('re-dilutions : la fenêtre chiffre les lots et volumes du run, exemplaires compris',
+      /1 lot\b/.test(panneau.un[0].run || '') && /10 µL de stock/.test(panneau.un[0].run || '')
+      && /70 µL de diluant/.test(panneau.un[0].run || '') && /= 80 µL/.test(panneau.un[0].run || '')
+      && /2 lots/.test((panneau.deux[0]||{}).run || '') && /20 µL de stock/.test((panneau.deux[0]||{}).run || '')
+      && /140 µL de diluant/.test((panneau.deux[0]||{}).run || '') && /= 160 µL/.test((panneau.deux[0]||{}).run || ''),
+      panneau);
     await page.context().close();
   }
 
