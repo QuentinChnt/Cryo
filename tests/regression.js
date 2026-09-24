@@ -954,6 +954,7 @@ const SEED = `(() => {
       const c = document.querySelector('#p-grab .p-grab:not(.p-grab-veh)');
       return { badge: T(c && c.querySelector('.p-redil-badge')),
                totaux: T(c && c.querySelector('.p-redil-tot')),
+               court: T(c && c.querySelector('.p-redil-short')),
                tubes: T(c && c.querySelector('.p-ntube')),
                ligneRecette: !!document.querySelector('#p-recipes .p3-step.redil'),
                basVide: /Aucune dilution|No dilution/.test(T(document.getElementById('p-recipes')) || '') };
@@ -962,13 +963,20 @@ const SEED = `(() => {
     // demandee par le Tecan, elle n'a donc rien a faire dans la liste du bas.
     check('re-dilutions : la pré-dilution ne figure plus dans la liste des dilutions',
       calc.ligneRecette === false && calc.basVide === true, calc);
-    // 200 µL demandes -> 3 lots de 80 µL : ce sont les volumes TOTAUX qui
-    // doivent s'afficher, pas la recette d'un seul lot.
-    check('re-dilutions : la carte porte les volumes totaux, lots compris',
-      /30 µL stock/.test(calc.totaux || '') && /210 µL diluant/.test(calc.totaux || '')
-      && /240 µL/.test(calc.totaux || ''), calc);
+    // La pré-dilution se prépare autant de fois que le run est lancé : ici une
+    // seule fois, donc la recette telle quelle — et surtout pas un multiplicateur
+    // déduit du volume à couvrir, qui donnait des ×3 ou ×7 imprévisibles.
+    check('re-dilutions : un seul exemplaire affiche la recette telle quelle',
+      /10 µL stock/.test(calc.totaux || '') && /70 µL diluant/.test(calc.totaux || '')
+      && /80 µL/.test(calc.totaux || '') && !/×/.test(calc.badge || ''), calc);
+    // 200 µL demandés, un exemplaire n'en prépare que 80 : on le signale au
+    // lieu de gonfler le compte dans le dos de l'opérateur.
+    check('re-dilutions : un volume insuffisant est signalé, pas compensé en silence',
+      /220/.test(calc.court || ''), calc);
+    // Les tubes restent comptés sur le STOCK consommé (10 µL), pas sur les 80 µL
+    // de solution finale : un seul aliquot de 30 µL suffit.
     check('re-dilutions : les tubes sont comptés sur le stock consommé, pas sur le volume final',
-      /×3/.test(calc.badge || '') && calc.tubes === '1', calc);
+      calc.tubes === '1', calc);
 
     /* Doubler le protocole doit doubler la pre-dilution. Avant, la carte
        affichait « ×2 » a cote de la recette d'UN lot : l'operateur preparait
@@ -1019,8 +1027,8 @@ const SEED = `(() => {
     // Recette d'un lot : 10 / 67.6 / 2.4 -> 80 µL. Doubler le protocole doit
     // afficher, sous chaque colonne, exactement le double.
     check('re-dilutions : la fenêtre chiffre le run sous chaque colonne, exemplaires compris',
-      (panneau.un[0].run || '') === '×1 lot—10 µL67.6 µL2.4 µL80 µL'
-      && ((panneau.deux[0]||{}).run || '') === '×2 lots—20 µL135.2 µL4.8 µL160 µL',
+      (panneau.un[0].run || '') === '×1 exemplaire—10 µL67.6 µL2.4 µL80 µL'
+      && ((panneau.deux[0]||{}).run || '') === '×2 exemplaires—20 µL135.2 µL4.8 µL160 µL',
       panneau);
     await page.context().close();
   }

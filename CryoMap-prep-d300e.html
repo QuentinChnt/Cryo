@@ -4939,6 +4939,8 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 .p-redil-tot{display:inline-flex;align-items:center;gap:4px;margin-left:6px;
   font-family:var(--mono);font-size:11px;color:var(--ink-3);white-space:nowrap}
 .p-redil-tot b{color:var(--ink-1);font-weight:700}
+.p-redil-short{display:inline-flex;align-items:center;gap:3px;margin-left:6px;
+  font-size:11px;font-weight:700;color:var(--danger,#b4443c);cursor:help;white-space:nowrap}
 .p-redil-badge:hover{text-decoration:underline}
 .rd-hint{font-size:12.5px;color:var(--ink-3);margin-bottom:12px;line-height:1.45}
 .rd-table{display:flex;flex-direction:column;gap:6px}
@@ -4973,6 +4975,10 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 .rd-run-v small{font-family:var(--mono);font-weight:400;font-size:10.5px;color:var(--ink-4)}
 .rd-run-v.dash{color:var(--ink-4);font-weight:400}
 .rd-run-v.total{color:var(--accent-ink)}
+/* Ce que les exemplaires préparent ne couvre pas ce que le Tecan réclame. */
+.rd-run.court::before{background:var(--danger-soft)}
+.rd-run.court .rd-run-v.total{color:var(--danger)}
+.rd-run-warn{color:var(--danger);font-weight:700;cursor:help}
 .rd-empty{font-size:12.5px;color:var(--ink-3);margin:8px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rd-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
 #sidePanelModal .modal{max-width:760px!important}
@@ -14602,6 +14608,12 @@ function deleteLiveZone(freezerId, zoneId){
 
   function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function fmt(v){ if(v==null||!isFinite(v)) return "—"; var r=Math.round(v*10)/10; return (Math.abs(r)<1e-9?0:r).toString(); }
+  /* Les recettes de re-dilution sont saisies au centieme (5.76, 0.24 µL) :
+     les multiplier puis arrondir au dixieme rendait 11.5 et 0.5 la ou il faut
+     lire 11.52 et 0.48. On garde donc deux decimales sous 100 µL. */
+  function fmtP(v){ if(v==null||!isFinite(v)) return "—";
+    var r=(Math.abs(v)<100)?Math.round(v*100)/100:Math.round(v*10)/10;
+    return (Math.abs(r)<1e-9?0:r).toString(); }
   function nv(v){ return (v===""||v==null)?"":String(v); }
   function shade(hex,amt){ var c=hex.replace("#",""); var r=parseInt(c.slice(0,2),16),g=parseInt(c.slice(2,4),16),b=parseInt(c.slice(4,6),16); function m(v){return Math.round(v+(255-v)*amt);} return "rgb("+m(r)+","+m(g)+","+m(b)+")"; }
 
@@ -15067,18 +15079,20 @@ function deleteLiveZone(freezerId, zoneId){
        Il porte deja les exemplaires du protocole : doubler un .tdd double ce
        volume, donc le nombre de lots et les quantites a preparer. C'est ce que
        la fenetre doit montrer — la recette, elle, reste celle d'UN lot. */
-    var besoin={};
+    var duRun={};
     try{ groupResults().forEach(function(g){
-      if(g && g.mother && g.mother.used>0) besoin[normDrug(g.name)]=g.mother.used; }); }catch(e){}
+      if(g && g.mother && g.mother.used>0)
+        duRun[normDrug(g.name)]={besoin:g.mother.used, runs:Math.max(1,Number(g.runs)||1)}; }); }catch(e){}
     function pourLeRun(r){
-      var v=besoin[normDrug(r.name||"")];
-      if(!(v>0)) return null;                       // cette drogue n'est pas dans le run
+      var e=duRun[normDrug(r.name||"")];
+      if(!e) return null;                            // cette drogue n'est pas dans le run
       var c=computed(r), dv=num(r.d);
       if(!(c.fv>0) || !(dv>0)) return null;          // recette incomplete
-      var lots=Math.max(1, Math.ceil(v/c.fv));
-      return {besoin:v, lots:lots, stock:lots*dv,
-              pbs:lots*(num(r.p)||0), tween:lots*(num(r.t)||0),
-              diluant:lots*((num(r.p)||0)+(num(r.t)||0)), total:lots*c.fv};
+      var n=e.runs;                                  // exemplaires du run, pas un compte de lots
+      return {besoin:e.besoin, runs:n, stock:n*dv,
+              pbs:n*(num(r.p)||0), tween:n*(num(r.t)||0),
+              diluant:n*((num(r.p)||0)+(num(r.t)||0)), total:n*c.fv,
+              court:(n*c.fv < e.besoin-1e-9)};
     }
     /* Les quantites a preparer, alignees SOUS les colonnes de la recette : la
        recette reste celle d'un lot (modifiable), la ligne du dessous donne ce
@@ -15088,16 +15102,19 @@ function deleteLiveZone(freezerId, zoneId){
       var q=pourLeRun(r);
       if(!q) return '';
       var mL=' <small>µL</small>';
-      return '<div class="rd-run" title="'+esc(en
-          ? (q.lots+' batch(es) of '+fmt(num(r.d))+' µL drawn — the run needs '+fmt(q.besoin)+' µL of working solution')
-          : (q.lots+' lot(s) de '+fmt(num(r.d))+' µL prélevés — le run demande '+fmt(q.besoin)+' µL de solution de travail'))+'">'
-        + '<span class="rd-run-k">\u00d7'+q.lots+' <em>'+(en?(q.lots>1?"batches":"batch"):(q.lots>1?"lots":"lot"))+'</em></span>'
+      var titre=en
+        ? ('Loaded '+q.runs+' time(s) in this run. The Tecan needs '+fmt(q.besoin)+' µL of working solution'
+           + (q.court?' — MORE than these '+fmt(q.total)+' µL.':'.'))
+        : ('Chargé '+q.runs+' fois dans ce run. Le Tecan demande '+fmt(q.besoin)+' µL de solution de travail'
+           + (q.court?(' — PLUS que ces '+fmt(q.total)+' µL.'):'.'));
+      return '<div class="rd-run'+(q.court?' court':'')+'" title="'+esc(titre)+'">'
+        + '<span class="rd-run-k">\u00d7'+q.runs+' <em>'+(en?(q.runs>1?"runs":"run"):(q.runs>1?"exemplaires":"exemplaire"))+'</em></span>'
         + '<span class="rd-run-v dash">—</span>'
-        + '<span class="rd-run-v">'+fmt(q.stock)+mL+'</span>'
-        + '<span class="rd-run-v">'+fmt(q.pbs)+mL+'</span>'
-        + '<span class="rd-run-v">'+fmt(q.tween)+mL+'</span>'
-        + '<span class="rd-run-v total">'+fmt(q.total)+mL+'</span>'
-        + '<span></span></div>';
+        + '<span class="rd-run-v">'+fmtP(q.stock)+mL+'</span>'
+        + '<span class="rd-run-v">'+fmtP(q.pbs)+mL+'</span>'
+        + '<span class="rd-run-v">'+fmtP(q.tween)+mL+'</span>'
+        + '<span class="rd-run-v total">'+fmtP(q.total)+mL+'</span>'
+        + '<span>'+(q.court?'<span class="rd-run-warn">\u26a0</span>':'')+'</span></div>';
     }
     function paint(){
       var h='<div class="rd-hint">'+(en
@@ -15246,7 +15263,21 @@ function deleteLiveZone(freezerId, zoneId){
     var arr=[]; for(var i=0;i<n;i++) arr.push(sf);
     return arr;
   }
-  function computeTree(fmap, aliqOverride, redil){
+  /* Nombre d'exemplaires du run pour une drogue : la somme des exemplaires des
+     protocoles qui la contiennent. Un .tdd chargé deux fois -> 2. Des fluides
+     saisis à la main sans protocole retombent sur le réglage global. */
+  function groupRuns(items){
+    var vus={}, n=0, manuel=false;
+    (items||[]).forEach(function(f){
+      if(f && f.srcId){ if(!vus[f.srcId]){ vus[f.srcId]=1; var sr=srcById(f.srcId);
+        n += sr?Math.max(1,Number(sr.copies)||1):1; } }
+      else manuel=true;
+    });
+    if(manuel && !n) n=Math.max(1,Number(prep.plates)||1);
+    return Math.max(1,n);
+  }
+
+  function computeTree(fmap, aliqOverride, redil, runs){
     // Prelevement minimum : 1 µL par defaut, librement modifiable par l'operateur
     var e=(Number(prep.excess)||0)/100;
     var minPip=Number(prep.minPip); if(!(minPip>0)) minPip=1; var dmin=minPip;
@@ -15291,14 +15322,22 @@ function deleteLiveZone(freezerId, zoneId){
     // le Tecan) mais le volume de STOCK consomme pour fabriquer, par lots de
     // redil.finalVol, assez de solution mere. Sans quoi l'app comptait le
     // volume final au lieu du volume reellement preleve sur l'aliquot stocke.
+    /* La pre-dilution se prepare AUTANT DE FOIS QUE LE RUN EST LANCE : un .tdd
+       chargé deux fois, c'est deux fois la recette. Le nombre de lots était
+       auparavant déduit du volume à couvrir (ceil(volume/lot)), ce qui donnait
+       des multiplicateurs imprévisibles — un ×7 sur un seul protocole, un ×2
+       là où l'opérateur en attendait un. Le volume requis n'est pas perdu pour
+       autant : s'il dépasse ce que les exemplaires préparent, `court` le dit,
+       plutôt que de gonfler le compte en silence. */
     var redilInfo=null, consumeVol=mother.used;
     if(redil && Number(redil.finalVol)>0 && Number(redil.drawVol)>0){
       var _fv=Number(redil.finalVol), _dv=Number(redil.drawVol);
-      var batches=Math.max(1, Math.ceil(mother.used/_fv));
-      var stockUsed=batches*_dv;
+      var _n=Math.max(1, Math.round(Number(runs)||1));
+      var stockUsed=_n*_dv, madeVol=_n*_fv;
       consumeVol=stockUsed;
-      redilInfo={recipe:redil, batches:batches, stockUsed:stockUsed,
-                 madeVol:batches*_fv, workingLeftover:batches*_fv-mother.used};
+      redilInfo={recipe:redil, runs:_n, stockUsed:stockUsed, madeVol:madeVol,
+                 besoin:mother.used, court:(madeVol < mother.used-1e-9),
+                 workingLeftover:madeVol-mother.used};
     }
     var tubes=aliquot?Math.max(1,Math.ceil(consumeVol/aliquot)):null;
     var leftover=aliquot?tubes*aliquot-consumeVol:null;
@@ -15324,12 +15363,14 @@ function deleteLiveZone(freezerId, zoneId){
       // plus petit, et l'ecart doit se voir.
       var _volAll=(_sp0&&_sp0.volAll&&_sp0.volAll.length>1)?_sp0.volAll.slice().sort(function(x,y){return x-y;}):null;
       // Nombre de tubes impose par l'operateur : il prime sur le calcul.
-      var r=computeTree(fmap, _av0, redilRecipeFor(g.name)); if(r.empty){ r={empty:true,mother:{used:0,load:0},dils:[],tubes:null,leftover:null,totalDiluent:0,aliquot:null}; }
+      var _runs=groupRuns(g.items);
+      var r=computeTree(fmap, _av0, redilRecipeFor(g.name), _runs); if(r.empty){ r={empty:true,mother:{used:0,load:0},dils:[],tubes:null,leftover:null,totalDiluent:0,aliquot:null}; }
       r.name=g.name;
       // Surcharge manuelle du nombre de tubes (prime sur le calcul)
       var _ovK=normDrug(g.name||"");
       var _ovT=prepTubes(); if(_ovT[_ovK]!=null){ r.tubes=_ovT[_ovK]; r.tubesManual=true; } r._idx=g.idx; r.inv=inv; r.match=_match; r.invName=inv?inv.name:null; r.volMixed=_volAll;
       r.groupKey=k; r.approxKey=_fzKey;   // de quoi confirmer l'appariement en un clic
+      r.runs=_runs;
       r.diluentGuessed = !groupSol && !drugDiluentKnown(inv?inv.name:g.name); r.stock=inv?inv.stock:null; r.ambiguous=isAmbiguousSpot(inv); r.loc=inv?spotFor(inv):null; r.spot=spotOf(inv); r.exp=spotExpiryState(r.spot); r.code=inv?inv.code:null; r.diluent=groupSol||(inv?inv.diluent:drugDiluent(g.name)); r.concUnit=concUnit; if(r.nodes) r.nodes.forEach(function(n){ if(concByFactor[n.factor]!=null) n.conc=concByFactor[n.factor]; }); r.missingConc=missingConc; r.hasData=any; results.push(r); });
     results.sort(function(a,b){return (a._idx||0)-(b._idx||0);});
     // Les couleurs sont attribuees dans l'ordre D'AFFICHAGE (zone puis niveau),
@@ -15548,20 +15589,29 @@ function deleteLiveZone(freezerId, zoneId){
            recette d'UN lot etait affichee a cote d'un « ×2 » : en doublant le
            protocole, l'operateur preparait 80 µL au lieu de 160. */
         var _rc=r.redil.recipe, _add=(Number(_rc.pbs)||0)+(Number(_rc.pbsTween)||0);
-        var _nb=Math.max(1, Number(r.redil.batches)||1);
+        var _nb=Math.max(1, Number(r.redil.runs)||1);
         var _totS=Number(r.redil.stockUsed), _totA=_add*_nb, _totF=Number(r.redil.madeVol);
         var _lot=(_nb>1)
-          ? (en ? (' ('+_nb+' batches of '+fmt(_rc.drawVol)+' + '+fmt(_add)+' = '+fmt(_rc.finalVol)+' µL)')
-                : (' ('+_nb+' lots de '+fmt(_rc.drawVol)+' + '+fmt(_add)+' = '+fmt(_rc.finalVol)+' µL)'))
+          ? (en ? (' ('+_nb+' \u00d7 '+fmt(_rc.drawVol)+' + '+fmt(_add)+' = '+fmt(_rc.finalVol)+' µL)')
+                : (' ('+_nb+' \u00d7 '+fmt(_rc.drawVol)+' + '+fmt(_add)+' = '+fmt(_rc.finalVol)+' µL)'))
           : '';
         var _rtitle=en
           ? ('Pre-dilute before loading, then the Tecan dilutions start from THIS solution. Total: '
              +fmt(_totS)+' µL of stock + '+fmt(_totA)+' µL diluent (PBS + PBS-Tween) \u2192 '+fmt(_totF)+' µL at working concentration'+_lot+'.')
           : ('À rediluer avant chargement ; les dilutions du Tecan repartent de CETTE solution. Au total : '
              +fmt(_totS)+' µL de stock + '+fmt(_totA)+' µL de diluant (PBS + PBS-Tween) → '+fmt(_totF)+' µL à la concentration de travail'+_lot+'.');
+        /* Le volume préparé ne couvre pas ce que le Tecan réclame : on le dit
+           au lieu d'augmenter le multiplicateur dans le dos de l'opérateur. */
+        var _court=r.redil.court
+          ? ' <span class="p-redil-short" title="'+esc(en
+              ? ('The run needs '+fmt(r.redil.besoin)+' µL of working solution; '+_nb+' \u00d7 the recipe makes '+fmt(_totF)+' µL. Increase the recipe volume or the number of copies.')
+              : ('Le run demande '+fmt(r.redil.besoin)+' µL de solution de travail ; '+_nb+' \u00d7 la recette en fait '+fmt(_totF)+' µL. Augmente le volume de la recette ou le nombre d\'exemplaires.'))
+            +'">\u26a0 '+(en?('needs '+fmt(r.redil.besoin)+' µL'):('il en faut '+fmt(r.redil.besoin)+' µL'))+'</span>'
+          : '';
         sub+=' <span class="p-redil-badge" data-redil="'+esc(r.name)+'" title="'+esc(_rtitle)+'">⚗ '+(en?"redilute":"rediluer")+(_nb>1?(' ×'+_nb):'')+'</span>'
-           + '<span class="p-redil-tot" title="'+esc(_rtitle)+'">'+fmt(_totS)+' µL '+(en?'stock':'stock')
-           + ' + '+fmt(_totA)+' µL '+(en?'diluent':'diluant')+' → <b>'+fmt(_totF)+' µL</b></span>';
+           + '<span class="p-redil-tot" title="'+esc(_rtitle)+'">'+fmtP(_totS)+' µL '+(en?'stock':'stock')
+           + ' + '+fmtP(_totA)+' µL '+(en?'diluent':'diluant')+' → <b>'+fmtP(_totF)+' µL</b></span>'
+           + _court;
       }
       h+='<div class="p-grab'+(done?' done':'')+'" data-tog="'+esc(gid)+'"><span class="cbar" style="background:'+c+';position:absolute;left:0;top:50%;transform:translateY(-50%);height:104px;width:5px;border-radius:3px;z-index:2"></span>';
       h+='<div class="p-gid"><div class="p-gtext"><div class="p-gname">'+esc(capFirst(r.name))+(r.code?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:var(--r-xs);background:'+shade(c,.82)+';color:'+c+';font-family:ui-monospace,SFMono-Regular,monospace">'+esc(r.code)+'</span>':'')+(r.match==='approche'?' <span class="p-approx" title="'+esc(en?('Name not found as such in CryoMap. Nearest product proposed: '+(r.invName||'')):('Nom introuvable tel quel dans CryoMap. Produit le plus proche proposé : '+(r.invName||'')))+'">\u2248 '+esc(r.invName||'')+'</span> <button type="button" class="p-approx-ok" data-linkok="'+esc(r.groupKey||'')+'" data-linkval="'+esc(r.approxKey||'')+'" title="'+esc(en?('Confirm that "'+(r.name||'')+'" is indeed "'+(r.invName||'')+'"'):('Confirmer que « '+(r.name||'')+' » est bien « '+(r.invName||'')+' »'))+'">'+(en?'Confirm':'Confirmer')+'</button>':'')+'</div><div class="p-gsub">'+sub+'</div></div></div>';
