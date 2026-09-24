@@ -88,6 +88,14 @@ saisie dans les Préférences).
 | `tools/extract-layout.js` | plan du congélateur lu dans la page → `tools/zones.json` |
 | `tools/convert.sh` | `.webm` → `.mp4` |
 | `out/cryomap-demo.mp4` | la vidéo |
+| `tests/regression.js` | 100 cas de régression |
+| `tests/fake-firestore.js` | Firestore en mémoire, avec écoute temps réel |
+| `tests/shots.sha256` | empreintes des 27 captures de référence |
+| `tools/shots.js` | les captures |
+| `tools/shots-check.js` | comparaison aux empreintes |
+| `tools/css-oracle.js` | « ces deux fichiers rendent-ils la même chose ? » |
+| `tools/css-important.js` | quelles propriétés `!important` sont disputées |
+| `tools/css-bisect.js` | retrait vérifié des `!important` inutiles |
 
 ---
 
@@ -150,6 +158,20 @@ La migration depuis l'ancien format est automatique : au premier lancement
 connecté, l'app réécrit l'état en sous-collections, marque `schema: 2` et
 retire l'ancien champ. Rien à faire à la main.
 
+### Coût en lectures
+
+Le quota gratuit de Firestore est de **50 000 documents lus par jour**, tous
+postes confondus. L'app ouvrait la salle en deux temps : quatre `.get()`
+complets, puis quatre `onSnapshot` qui relisaient chacun sa collection
+entière. Chaque ouverture d'onglet coûtait donc **deux fois** le contenu de
+la salle — environ 5 000 lectures à 2 563 aliquots, soit dix ouvertures par
+jour avant épuisement du quota (et l'arrêt de la synchro jusqu'à minuit UTC).
+
+Le premier message d'un `onSnapshot` porte déjà tous les documents : `fbBootstrap()`
+amorce l'état avec lui et garde l'écoute. Coût divisé par deux, comportement
+identique. Un cas de régression le verrouille : ouvrir l'app ne doit déclencher
+**aucune** lecture de collection entière.
+
 ## Stockage local
 
 `IndexedDB` est le magasin de référence ; `localStorage` n'est qu'un miroir,
@@ -166,11 +188,38 @@ magasins échouent un **bandeau rouge permanent** le dit au lieu d'un toast.
 Les sauvegardes automatiques y vivent aussi : 10 points de retour au lieu de
 3, sélectionnables dans « Restaurer une sauvegarde ».
 
+**Avant un écrasement forcé**, le contenu du cloud est déposé dans cette même
+liste (« Cloud avant écrasement »). La fenêtre de confirmation chiffre ce qui
+va disparaître — *cloud : 2 563 aliquots · ce poste : 12* — et avertit
+explicitement quand ce poste en a moins que le cloud. Auparavant le bouton
+remplaçait la salle en un clic, sans rien annoncer et sans retour possible.
+
+**L'annulation survit au rechargement.** La pile de `Ctrl+Z` ne vivait qu'en
+mémoire, alors que les points de retour correspondants étaient déjà dans
+IndexedDB. Elle est réamorcée avec eux au démarrage, sans un octet de
+stockage supplémentaire (les chaînes sont partagées).
+
+## Stockage de la préparation D300e
+
+Les protocoles `.tdd` mémorisés (`cryomap-tdd-files-v1`) et le run en cours
+(`cryomap-prep-run-v2`) ne vivaient que dans `localStorage`, dont le quota est
+partagé avec l'inventaire complet : l'écriture pouvait être refusée en
+silence, et la bibliothèque de protocoles disparaissait sans un mot. Même
+modèle que l'état principal désormais : IndexedDB en magasin de référence,
+`localStorage` en miroir synchrone pour l'affichage immédiat, reprise
+automatique de la version la plus récente au démarrage.
+
+Le run en cours n'est repris que si rien n'a été saisi entre-temps : une
+version de secours ne doit jamais écraser un travail en cours.
+
+La bibliothèque `.tdd` voyage aussi avec l'export JSON — sans jamais entrer
+dans l'état synchronisé, car elle est locale au poste.
+
 ## Tests
 
 ```bash
 npm install
-npm test                 # 84 cas de régression, Playwright
+npm test                 # 100 cas de régression, Playwright
 ```
 
 Chaque cas reproduit un bug réellement observé avant de vérifier sa
@@ -183,6 +232,74 @@ Sur une machine sans Chromium par défaut :
 
 `APP_FILE=autre.html npm test` fait tourner la même suite sur une autre
 variante du fichier, sans toucher au harnais.
+
+### Garde-fou visuel
+
+```bash
+npm run shots         # 27 captures (9 vues x 3 largeurs) dans out/shots
+npm run shots:check   # les compare aux empreintes de tests/shots.sha256
+npm run shots:ref     # régénère les empreintes, après vérification à l'œil
+```
+
+Le CSS pèse ~4 800 lignes et repose sur beaucoup de `!important` : le modifier
+à l'aveugle était risqué. Ces empreintes transforment « risqué » en
+« vérifiable » — toute règle qui déplace un pixel, dans l'une des neuf vues et
+à l'une des trois largeurs (1440 / 880 / 420 px, choisies de part et d'autre
+des points de rupture), est signalée nommément.
+
+Les captures sont déterministes : même jeu de données figé, mêmes dates, aucun
+identifiant aléatoire. Deux exécutions successives donnent des fichiers
+identiques au pixel près.
+
+### Nettoyage du CSS, mesuré
+
+```bash
+npm run css:important   # quelles propriétés !important sont disputées ?
+node tools/css-bisect.js [--ecrire]
+```
+
+`tools/css-oracle.js` répond à une seule question : **deux versions du fichier
+rendent-elles exactement la même chose ?** Il relève, pour chaque élément de
+chaque état à chaque largeur, sa boîte et la valeur calculée de toutes les
+propriétés concernées. `css-bisect` s'en sert pour retirer les `!important`
+un lot à la fois : un lot qui passe est adopté en bloc, un lot qui échoue est
+coupé en deux jusqu'à isoler les déclarations réellement utiles.
+
+Résultat mesuré : **155 des 1 002 `!important` retirés** en 75 essais, sans le
+moindre écart ; 12 candidats conservés parce qu'ils changent vraiment quelque
+chose — dont `.freezer-grid { gap: 14px !important }`, sans lequel la grille
+de l'aperçu se décale de 4 px. S'y ajoutent **50 règles mortes supprimées** et
+18 listes de sélecteurs élaguées (31 classes citées par le CSS n'existent nulle
+part ailleurs dans le fichier), soit 5,9 Ko.
+
+Les 847 `!important` restants ne sont pas du bruit : ils portent en majorité
+sur `background`, `color`, `padding`, `border`, `width` et `font-size`, où des
+règles concurrentes se disputent réellement le même élément. Les retirer
+demanderait de restructurer la cascade — une refonte, pas un nettoyage.
+
+> Une première tentative avait basculé les `!important` via le CSSOM plutôt que
+> dans le texte du fichier. Cette méthode déclarait inoffensives des
+> modifications qui ne l'étaient pas : c'est la comparaison de captures qui a
+> rattrapé l'erreur. D'où l'oracle actuel, qui mesure toujours le rendu réel
+> d'un fichier réellement modifié.
+
+### Compatibilité navigateurs
+
+Seul Chromium est installé dans le conteneur de test : les contrôles se font
+donc sur la **source**, et empêchent la réapparition des constructions qui ne
+marchent que sur un moteur.
+
+| Contrôle | Pourquoi |
+|---|---|
+| `backdrop-filter` toujours doublé de `-webkit-backdrop-filter` | Safari n'accepte la forme sans préfixe qu'à partir de la 18 ; sans lui les panneaux perdent leur flou |
+| `user-select` toujours doublé de `-webkit-user-select` | idem depuis Safari 17 ; sans lui les libellés redeviennent sélectionnables en plein glisser-déposer |
+| aucun sélecteur `:has()` | absent de Firefox avant la 121 |
+| aucune expression régulière à rétro-assertion | absente de Safari avant la 16.4 |
+| aucune API JS trop récente pour Safari 15 | `structuredClone`, `requestIdleCallback`, `crypto.randomUUID`, `Object.hasOwn`, `findLast`, `toSorted`, `AbortSignal.timeout` |
+| l'API fichier locale reste détectée avant usage | `showSaveFilePicker` n'existe que sur Chromium |
+
+L'audit initial a trouvé trois `backdrop-filter` et trois `user-select` sans
+préfixe, et un `:has()` remplacé par le sélecteur d'identifiant équivalent.
 
 ### Le moteur D300e
 

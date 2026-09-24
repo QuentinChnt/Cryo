@@ -1216,6 +1216,56 @@ const SEED = `(() => {
     await page.context().close();
   }
 
+  /* ============ 10 bis. Compatibilité navigateurs ============
+     Seul Chromium est installé dans ce conteneur : ces contrôles se font donc
+     sur la SOURCE, pas à l'exécution. Ils empêchent la réapparition des
+     constructions qui ne marchent que sur un moteur. */
+  {
+    const src = fs.readFileSync(path.resolve(__dirname, '..', APP_FILE), 'utf8');
+    const css = src.split('</style>').slice(0, -1).map(b => b.slice(b.indexOf('<style') >= 0 ? b.indexOf('>', b.indexOf('<style')) + 1 : 0)).join('\n')
+                   .replace(/\/\*[\s\S]*?\*\//g, '');   // sans les commentaires
+
+    // Une regle est le texte entre deux accolades : on y cherche la paire.
+    const sansPrefixe = prop => {
+      const manquants = [];
+      const re = new RegExp('(?<!-webkit-)(?<!-moz-)' + prop + '\\s*:', 'g');
+      let m;
+      while ((m = re.exec(css))) {
+        const debut = css.lastIndexOf('{', m.index), fin = css.indexOf('}', m.index);
+        const regle = css.slice(debut < 0 ? 0 : debut, fin < 0 ? css.length : fin);
+        if (regle.indexOf('-webkit-' + prop) === -1) manquants.push(css.slice(m.index - 40, m.index + 40));
+      }
+      return manquants;
+    };
+
+    // Safari n'a `backdrop-filter` sans prefixe qu'a partir de la 18, et
+    // `user-select` qu'a partir de la 17 : sans la version -webkit-, les
+    // panneaux perdent leur flou et les libelles redeviennent selectionnables
+    // en plein glisser-deposer.
+    check('backdrop-filter : la variante -webkit- est toujours présente',
+      sansPrefixe('backdrop-filter').length === 0, sansPrefixe('backdrop-filter'));
+    check('user-select : la variante -webkit- est toujours présente',
+      sansPrefixe('user-select').length === 0, sansPrefixe('user-select'));
+
+    // :has() n'existe pas dans Firefox avant la 121.
+    check('aucun sélecteur :has() dans le CSS', css.indexOf(':has(') === -1,
+      css.slice(Math.max(0, css.indexOf(':has(') - 60), css.indexOf(':has(') + 60));
+
+    // API trop recentes pour Safari 15/16, encore courant sur les Mac du labo.
+    const recentes = ['structuredClone', 'requestIdleCallback', 'crypto.randomUUID',
+                      'Object.hasOwn', '.findLast(', '.toSorted(', '.toReversed(',
+                      'AbortSignal.timeout', 'Array.fromAsync'];
+    const vues = recentes.filter(n => src.indexOf(n) !== -1);
+    check('aucune API JS trop récente pour Safari 15', vues.length === 0, vues);
+
+    // Les expressions regulieres a retro-assertion ne marchent pas sur Safari < 16.4.
+    check('aucune expression régulière à rétro-assertion', /\(\?<[=!]/.test(src) === false);
+
+    // L'API fichier n'existe que sur Chromium : elle doit rester detectee.
+    check('l’API fichier locale reste détectée avant usage',
+      /typeof window\.showSaveFilePicker === 'function'/.test(src));
+  }
+
   /* ============ 11. Parcours de fumée ============ */
   {
     const page = await newPage(browser);

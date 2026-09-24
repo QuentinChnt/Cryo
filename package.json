@@ -9,7 +9,11 @@
     "record": "xvfb-run -a --server-args=\"-screen 0 1400x900x24\" node record-demo.js",
     "convert": "./tools/convert.sh",
     "all": "npm run page && npm run seed && npm run record && npm run convert",
-    "test": "node tests/regression.js"
+    "test": "node tests/regression.js",
+    "shots": "node tools/shots.js out/shots",
+    "shots:check": "node tools/shots-check.js",
+    "shots:ref": "node tools/shots-check.js --ecrire",
+    "css:important": "node tools/css-important.js"
   },
   "dependencies": {
     "https-proxy-agent": "^7.0.6",

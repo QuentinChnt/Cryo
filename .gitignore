@@ -8,3 +8,8 @@ seed.json
 # capture intermediates; the .mp4 deliverable is committed
 out/*.webm
 out/capture.json
+
+# captures de reference regenerees a la demande (seules les empreintes sont suivies)
+out/shots/
+out/_candidat.html
+out/important.json
