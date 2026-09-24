@@ -1081,6 +1081,45 @@ const SEED = `(() => {
     // deux fois.
     check('re-dilutions : 75,9 µL demandés et 80 µL préparés ne disent rien',
       suffit.rouge === false && suffit.alerteCarte === null && suffit.note === null, suffit);
+
+    /* Le changement ne concerne QUE les pré-dilutions : sur un run sans aucune
+       recette, la marge du run continue de gouverner dilutions, véhicules,
+       tubes et restes. Ces valeurs ont été relevées sur la version d'avant les
+       changements (c019210) et sont identiques après. */
+    const reste = await page.evaluate(async () => {
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      state.preferences.redilRecipes = {};             // aucune pré-dilution
+      state.reagents = [];
+      ['Docetaxel','Paclitaxel','Olaparib'].forEach((n, j) => { for (let i = 0; i < 9; i++)
+        state.reagents.push({ id:'x'+j+i, name:n, quantity:'30 µL', units:3,
+          loc:{ freezerId:'F1', zoneId:'Z', boxRow:0, boxCol:0, row:i, col:j } }); });
+      saveState();
+      window.__prepRestore({ plates:1, mode:'serial', excess:10, minPrep:20, maxPrep:50, minPip:1,
+        load:2, tubesOv:{}, checks:{}, excluded:{}, spotChoice:{}, linkChoice:{},
+        norm:{ dmso:{disp:60,load:50}, tween:{disp:10,load:7}, plates:1 },
+        sources:[{ id:'s1', name:'a.tdd', n:6, copies:2,
+                   norm:{ dmso:{disp:60,load:50}, tween:{disp:10,load:7}, plates:1 } }],
+        fluids:[{ drug:'Docetaxel', dil:'mère', load:40, src:'a.tdd', srcId:'s1' },
+                { drug:'Docetaxel', dil:'1:4',  load:40, src:'a.tdd', srcId:'s1' },
+                { drug:'Docetaxel', dil:'1:16', load:40, src:'a.tdd', srcId:'s1' },
+                { drug:'Paclitaxel', dil:'mère', load:25, src:'a.tdd', srcId:'s1' },
+                { drug:'Paclitaxel', dil:'1:10', load:25, src:'a.tdd', srcId:'s1' },
+                { drug:'Olaparib', dil:'mère', load:15, src:'a.tdd', srcId:'s1' }] });
+      renderPrepTab(document.getElementById('canvas'));
+      await new Promise(r => setTimeout(r, 900));
+      return {
+        dilutions: Array.from(document.querySelectorAll('#p-recipes .p3-step')).map(e =>
+          Array.from(e.querySelectorAll('.p3-vol')).map(T).join('|')),
+        vehicules: Array.from(document.querySelectorAll('.p-vehs > *')).map(T),
+        tubes: Array.from(document.querySelectorAll('#p-grab .p-ntube')).map(T),
+        restes: Array.from(document.querySelectorAll('#p-grab .p-gsub')).map(T) };
+    });
+    check('hors pré-dilutions : dilutions, véhicules, tubes et restes inchangés',
+      JSON.stringify(reste.dilutions) === JSON.stringify(['28.1µL|84.2µL|112.2µL','22µL|66µL|88µL','5.5µL|49.5µL|55µL'])
+      && JSON.stringify(reste.vehicules) === JSON.stringify(['DMSObackfill 100 µL · dilutions 199.7 µL299.7µL','Tampon + Tweenbackfill 14 µL · dilutions 0 µL14µL'])
+      && JSON.stringify(reste.tubes) === JSON.stringify(['4','2','3'])
+      && JSON.stringify(reste.restes) === JSON.stringify(['aliquots 30 µL · reste 4 µL','aliquots 30 µL · reste 27 µL','aliquots 30 µL · reste 29.5 µL']),
+      reste);
     await page.context().close();
   }
 
