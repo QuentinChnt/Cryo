@@ -1030,6 +1030,28 @@ const SEED = `(() => {
       (panneau.un[0].run || '') === '×1 exemplaire—10 µL67.6 µL2.4 µL80 µL'
       && ((panneau.deux[0]||{}).run || '') === '×2 exemplaires—20 µL135.2 µL4.8 µL160 µL',
       panneau);
+
+    /* Une ligne rouge doit dire POURQUOI sur place : sans le chiffre qui
+       manque, l'opérateur ne peut que survoler et deviner. */
+    const manque = await page.evaluate(async () => {
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      window.__prepRestore({ plates:1, mode:'serial', excess:10, minPrep:20, maxPrep:50, minPip:1,
+        load:2, tubesOv:{}, norm:null, checks:{}, excluded:{}, spotChoice:{}, linkChoice:{},
+        sources:[{ id:'s1', name:'a.tdd', n:1, copies:1, norm:null }],
+        fluids:[{ drug:'Docetaxel', dil:'mère', load:200, src:'a.tdd', srcId:'s1' }] });
+      renderPrepTab(document.getElementById('canvas'));
+      await new Promise(r => setTimeout(r, 700));
+      const b = document.querySelector('#p-grab .p-redil-badge'); if (b) b.click();
+      await new Promise(r => setTimeout(r, 500));
+      const ligne = document.querySelector('#sidePanelModal .rd-run.court');
+      const out = { rouge: !!ligne, message: T(ligne && ligne.querySelector('.rd-run-msg')) };
+      document.querySelectorAll('#sidePanelModal').forEach(m => m.classList.remove('show'));
+      return out;
+    });
+    // 200 µL + 10 % de marge = 220 µL demandés, la recette n'en fait que 80.
+    check('re-dilutions : une ligne rouge écrit le volume qui manque',
+      manque.rouge === true && /220 µL/.test(manque.message || '')
+      && /80 µL/.test(manque.message || ''), manque);
     await page.context().close();
   }
 

@@ -4979,6 +4979,9 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 .rd-run.court::before{background:var(--danger-soft)}
 .rd-run.court .rd-run-v.total{color:var(--danger)}
 .rd-run-warn{color:var(--danger);font-weight:700;cursor:help}
+.rd-run-msg{grid-column:1/-1;margin-top:4px;font-size:11.5px;line-height:1.45;
+  color:var(--danger);font-family:inherit}
+.rd-run-msg b{font-family:var(--mono);font-weight:700}
 .rd-empty{font-size:12.5px;color:var(--ink-3);margin:8px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rd-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
 #sidePanelModal .modal{max-width:760px!important}
@@ -15114,7 +15117,18 @@ function deleteLiveZone(freezerId, zoneId){
         + '<span class="rd-run-v">'+fmtP(q.pbs)+mL+'</span>'
         + '<span class="rd-run-v">'+fmtP(q.tween)+mL+'</span>'
         + '<span class="rd-run-v total">'+fmtP(q.total)+mL+'</span>'
-        + '<span>'+(q.court?'<span class="rd-run-warn">\u26a0</span>':'')+'</span></div>';
+        + '<span>'+(q.court?'<span class="rd-run-warn">\u26a0</span>':'')+'</span>'
+        /* Le rouge seul obligeait a survoler pour savoir POURQUOI : le chiffre
+           qui manque est ecrit en clair, sous la ligne. */
+        + (q.court
+            ? ('<span class="rd-run-msg">\u26a0 '+(en
+                ? ('The run needs <b>'+fmtP(q.besoin)+' µL</b> of working solution; \u00d7'+q.runs
+                   +' the recipe makes only '+fmtP(q.total)+' µL. Raise the recipe volume, or the number of copies.')
+                : ('Le run demande <b>'+fmtP(q.besoin)+' µL</b> de solution de travail ; \u00d7'+q.runs
+                   +' la recette n\'en fait que '+fmtP(q.total)+' µL. Augmente le volume de la recette, ou le nombre d\'exemplaires.'))
+               +'</span>')
+            : '')
+        + '</div>';
     }
     function paint(){
       var h='<div class="rd-hint">'+(en
