@@ -953,16 +953,44 @@ const SEED = `(() => {
       const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
       const c = document.querySelector('#p-grab .p-grab:not(.p-grab-veh)');
       return { badge: T(c && c.querySelector('.p-redil-badge')),
+               totaux: T(c && c.querySelector('.p-redil-tot')),
                tubes: T(c && c.querySelector('.p-ntube')),
                ligneRecette: !!document.querySelector('#p-recipes .p3-step.redil'),
-               volumesRecette: Array.from(document.querySelectorAll('#p-recipes .p3-step.redil .p3-vol')).map(T) };
+               basVide: /Aucune dilution|No dilution/.test(T(document.getElementById('p-recipes')) || '') };
     });
-    check('re-dilutions : le mode opératoire s’affiche même sans dilution en série',
-      calc.ligneRecette === true, calc);
-    check('re-dilutions : la recette montre stock + diluant = solution de travail',
-      JSON.stringify(calc.volumesRecette) === JSON.stringify(['10µL','70µL','80µL']), calc);
+    // La pre-dilution fabrique la solution de DEPART : ce n'est pas une dilution
+    // demandee par le Tecan, elle n'a donc rien a faire dans la liste du bas.
+    check('re-dilutions : la pré-dilution ne figure plus dans la liste des dilutions',
+      calc.ligneRecette === false && calc.basVide === true, calc);
+    // 200 µL demandes -> 3 lots de 80 µL : ce sont les volumes TOTAUX qui
+    // doivent s'afficher, pas la recette d'un seul lot.
+    check('re-dilutions : la carte porte les volumes totaux, lots compris',
+      /30 µL stock/.test(calc.totaux || '') && /210 µL diluant/.test(calc.totaux || '')
+      && /240 µL/.test(calc.totaux || ''), calc);
     check('re-dilutions : les tubes sont comptés sur le stock consommé, pas sur le volume final',
       /×3/.test(calc.badge || '') && calc.tubes === '1', calc);
+
+    /* Doubler le protocole doit doubler la pre-dilution. Avant, la carte
+       affichait « ×2 » a cote de la recette d'UN lot : l'operateur preparait
+       80 µL au lieu de 160. */
+    const dbl = await page.evaluate(async () => {
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      const lire = async copies => {
+        window.__prepRestore({ plates:1, mode:'serial', excess:10, minPrep:20, maxPrep:50, minPip:1,
+          load:2, tubesOv:{}, norm:null, checks:{}, excluded:{}, spotChoice:{}, linkChoice:{},
+          sources:[{ id:'s1', name:'astellas.tdd', n:1, copies:copies, norm:null }],
+          fluids:[{ drug:'Docetaxel', dil:'mère', load:50, src:'astellas.tdd', srcId:'s1' }] });
+        renderPrepTab(document.getElementById('canvas'));
+        await new Promise(r => setTimeout(r, 700));
+        const c = document.querySelector('#p-grab .p-grab:not(.p-grab-veh)');
+        return T(c && c.querySelector('.p-redil-tot'));
+      };
+      return { un: await lire(1), deux: await lire(2) };
+    });
+    check('re-dilutions : doubler le protocole double la pré-dilution',
+      /10 µL stock/.test(dbl.un || '') && /70 µL diluant/.test(dbl.un || '') && /80 µL/.test(dbl.un || '')
+      && /20 µL stock/.test(dbl.deux || '') && /140 µL diluant/.test(dbl.deux || '') && /160 µL/.test(dbl.deux || ''),
+      dbl);
     await page.context().close();
   }
 

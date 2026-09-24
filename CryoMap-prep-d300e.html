@@ -4896,8 +4896,6 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 
 
 /* ---------- Étape de re-dilution manuelle (avant Tecan) ---------- */
-.p3-redil-tag{margin-left:8px;font-size:10.5px;font-weight:600;letter-spacing:.02em;
-  color:var(--warn);text-transform:none;vertical-align:middle}
 .p-redil-badge{display:inline-flex;align-items:center;gap:3px;margin-left:6px;
   font-size:11px;font-weight:600;color:var(--warn);cursor:help}
 
@@ -4936,6 +4934,11 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 /* ---------- Editeur de re-dilutions ---------- */
 .prs-btns{display:flex;gap:8px;margin-left:auto}
 .p-redil-badge{cursor:pointer!important}
+/* Les volumes reellement a preparer, lots compris, lisibles sans survol :
+   cette carte est le seul endroit ou la pre-dilution apparait desormais. */
+.p-redil-tot{display:inline-flex;align-items:center;gap:4px;margin-left:6px;
+  font-family:var(--mono);font-size:11px;color:var(--ink-3);white-space:nowrap}
+.p-redil-tot b{color:var(--ink-1);font-weight:700}
 .p-redil-badge:hover{text-decoration:underline}
 .rd-hint{font-size:12.5px;color:var(--ink-3);margin-bottom:12px;line-height:1.45}
 .rd-table{display:flex;flex-direction:column;gap:6px}
@@ -15475,11 +15478,25 @@ function deleteLiveZone(freezerId, zoneId){
       // reglages) : le nombre de tubes ci-dessus est deja calcule sur le
       // volume de STOCK necessaire, pas sur le volume de solution finale.
       if(r.redil){
+        /* La pre-dilution ne vit plus que sur cette carte : elle doit donc
+           porter les volumes REELLEMENT a preparer, lots compris. Avant, la
+           recette d'UN lot etait affichee a cote d'un « ×2 » : en doublant le
+           protocole, l'operateur preparait 80 µL au lieu de 160. */
         var _rc=r.redil.recipe, _add=(Number(_rc.pbs)||0)+(Number(_rc.pbsTween)||0);
+        var _nb=Math.max(1, Number(r.redil.batches)||1);
+        var _totS=Number(r.redil.stockUsed), _totA=_add*_nb, _totF=Number(r.redil.madeVol);
+        var _lot=(_nb>1)
+          ? (en ? (' ('+_nb+' batches of '+fmt(_rc.drawVol)+' + '+fmt(_add)+' = '+fmt(_rc.finalVol)+' µL)')
+                : (' ('+_nb+' lots de '+fmt(_rc.drawVol)+' + '+fmt(_add)+' = '+fmt(_rc.finalVol)+' µL)'))
+          : '';
         var _rtitle=en
-          ? ('Pre-dilute before loading: draw '+fmt(_rc.drawVol)+' µL of stock + '+fmt(_add)+' µL diluent (PBS + PBS-Tween) \u2192 '+fmt(_rc.finalVol)+' µL at working concentration. '+r.redil.batches+' batch(es) needed.')
-          : ('À rediluer avant chargement : prélever '+fmt(_rc.drawVol)+' µL de stock + '+fmt(_add)+' µL de diluant (PBS + PBS-Tween) → '+fmt(_rc.finalVol)+' µL à la concentration de travail. '+r.redil.batches+' lot(s) à préparer.');
-        sub+=' <span class="p-redil-badge" data-redil="'+esc(r.name)+'" title="'+esc(_rtitle)+'">⚗ '+(en?"redilute":"rediluer")+(r.redil.batches>1?(' ×'+r.redil.batches):'')+'</span>';
+          ? ('Pre-dilute before loading, then the Tecan dilutions start from THIS solution. Total: '
+             +fmt(_totS)+' µL of stock + '+fmt(_totA)+' µL diluent (PBS + PBS-Tween) \u2192 '+fmt(_totF)+' µL at working concentration'+_lot+'.')
+          : ('À rediluer avant chargement ; les dilutions du Tecan repartent de CETTE solution. Au total : '
+             +fmt(_totS)+' µL de stock + '+fmt(_totA)+' µL de diluant (PBS + PBS-Tween) → '+fmt(_totF)+' µL à la concentration de travail'+_lot+'.');
+        sub+=' <span class="p-redil-badge" data-redil="'+esc(r.name)+'" title="'+esc(_rtitle)+'">⚗ '+(en?"redilute":"rediluer")+(_nb>1?(' ×'+_nb):'')+'</span>'
+           + '<span class="p-redil-tot" title="'+esc(_rtitle)+'">'+fmt(_totS)+' µL '+(en?'stock':'stock')
+           + ' + '+fmt(_totA)+' µL '+(en?'diluent':'diluant')+' → <b>'+fmt(_totF)+' µL</b></span>';
       }
       h+='<div class="p-grab'+(done?' done':'')+'" data-tog="'+esc(gid)+'"><span class="cbar" style="background:'+c+';position:absolute;left:0;top:50%;transform:translateY(-50%);height:104px;width:5px;border-radius:3px;z-index:2"></span>';
       h+='<div class="p-gid"><div class="p-gtext"><div class="p-gname">'+esc(capFirst(r.name))+(r.code?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:var(--r-xs);background:'+shade(c,.82)+';color:'+c+';font-family:ui-monospace,SFMono-Regular,monospace">'+esc(r.code)+'</span>':'')+(r.match==='approche'?' <span class="p-approx" title="'+esc(en?('Name not found as such in CryoMap. Nearest product proposed: '+(r.invName||'')):('Nom introuvable tel quel dans CryoMap. Produit le plus proche proposé : '+(r.invName||'')))+'">\u2248 '+esc(r.invName||'')+'</span> <button type="button" class="p-approx-ok" data-linkok="'+esc(r.groupKey||'')+'" data-linkval="'+esc(r.approxKey||'')+'" title="'+esc(en?('Confirm that "'+(r.name||'')+'" is indeed "'+(r.invName||'')+'"'):('Confirmer que « '+(r.name||'')+' » est bien « '+(r.invName||'')+' »'))+'">'+(en?'Confirm':'Confirmer')+'</button>':'')+'</div><div class="p-gsub">'+sub+'</div></div></div>';
@@ -15547,17 +15564,16 @@ function deleteLiveZone(freezerId, zoneId){
   function recipesHTML(valid){
     var vv=valid.filter(function(r){return r.hasData;});
     if(vv.length===0) return "";
-    // Une drogue rediluee a la main AVANT le Tecan a un mode operatoire a
-    // montrer, meme chargee « mere » (aucune dilution en serie) — c'est meme le
-    // cas courant pour un anticorps. Elle n'apparaissait nulle part : la carte
-    // affichait « rediluer » et la section disait « Aucune dilution ».
-    var withDil=vv.filter(function(r){return r.dils.length>0 || r.redil;});
+    /* La pre-dilution n'est PAS une dilution du Tecan : c'est ce qui fabrique
+       la solution de depart, avant que le protocole n'entre en jeu. Sa place
+       est donc dans « A sortir & a preparer », en haut, avec le stock a
+       decongeler — pas ici. Cette section ne montre que les dilutions que le
+       Tecan demande : quand il reclame 1:10, c'est la solution DEJA pre-diluee
+       qu'on reprend pour en mettre 1 dans 10. */
+    var withDil=vv.filter(function(r){return r.dils.length>0;});
     var h='<div class="p-sec prep"><span class="ic">⚗</span>'+L("secPrepare")+'</div>';
     h+='<div class="p-legend"><span><span class="sw" style="background:var(--accent)"></span>'+L("legendDrawn")+'</span><span><span class="sw dil"></span>'+L("legendDiluent")+'</span><span>'+L("legendHeight")+'</span></div>';
     if(withDil.length===0) return h+'<div class="p-empty">'+L("noDil")+'</div>';
-    // Message d'information quand il n'y a QUE des pre-dilutions
-    if(!withDil.some(function(r){return r.dils.length>0;}))
-      h+='<div class="p-note-inline">'+L("noDil")+'</div>';
         // Echelle PHYSIQUE : les tubes de dilution font 500 µL. Le remplissage affiche
     // la proportion reelle dans le tube, donc 20 µL apparait bien comme un fond de tube.
     var TUBE_CAP=500;
@@ -15587,26 +15603,6 @@ function deleteLiveZone(freezerId, zoneId){
           +'<div class="p3-vol">'+vol+'<span>'+unitLbl+'</span></div>'
           +'</div>';
       }
-      // ===== Re-dilution manuelle avant Tecan (si une recette est definie pour
-      // cette drogue) : STOCK (congelateur) + PBS/PBS-Tween = solution mere.
-      // Le nom de la drogue est alors affiche ICI, pas sur la 1re dilution. =====
-      var hasRedilRow=!!r.redil;
-      if(r.redil){
-        var _rc=r.redil.recipe, _addV=(Number(_rc.pbs)||0)+(Number(_rc.pbsTween)||0);
-        var _hS=Math.max(2,(Number(_rc.drawVol)/maxVol)*100);
-        var _hA=Math.max(2,(_addV/maxVol)*100);
-        var _hO=Math.max(2,(Number(_rc.finalVol)/maxVol)*100);
-        var _batTxt=r.redil.batches>1?(' \u00d7'+r.redil.batches+' '+(curLang()==="en"?"batches":"lots")):'';
-        h+='<div class="p3-step redil"><span class="cbar" style="background:'+c+';position:absolute;left:0;top:50%;transform:translateY(-50%);height:104px;width:5px;border-radius:3px;z-index:2"></span>';
-        h+='<div class="p3-row">';
-        h+='<div class="p3-name">'+esc(capFirst(r.name))+'<span class="p3-redil-tag">'+(curLang()==="en"?"pre-dilution":"pré-dilution")+_batTxt+'</span></div>';
-        h+=tube((curLang()==="en"?"stock":"stock"), null, _hS, c, fmt(_rc.drawVol), '\u00b5L', 'src');
-        h+='<div class="p3-op">+</div>';
-        h+=tube('PBS + PBS-Tween', null, _hA, '#b9c6be', fmt(_addV), '\u00b5L', 'dil');
-        h+='<div class="p3-op eq">=</div>';
-        h+=tube(L("tuMother"), null, _hO, c, fmt(_rc.finalVol), '\u00b5L', 'out');
-        h+='</div></div>';
-      }
       // ===== Une ligne par dilution : PRELEVER + AJOUTER = OBTENIR (3 tubes) =====
       var m=r.mother;
       r.dils.forEach(function(n,idx){
@@ -15623,7 +15619,7 @@ function deleteLiveZone(freezerId, zoneId){
         // Le nom vit dans la rangee des tubes : il partage donc exactement
         // leur axe vertical, celui de la barre de couleur. Deja affiche sur
         // l'etape de re-dilution le cas echeant : pas de doublon.
-        h+='<div class="p3-name">'+((idx===0&&!hasRedilRow)?esc(capFirst(r.name)):'')+'</div>';
+        h+='<div class="p3-name">'+(idx===0?esc(capFirst(r.name)):'')+'</div>';
         h+=tube(parentTag, parentConc, hDraw, c, fmt(n.drawFromParent), '\u00b5L', 'src');
         h+='<div class="p3-op">+</div>';
         h+=tube(esc(dl), null, hDil, '#b9c6be', fmt(n.diluent), '\u00b5L', 'dil');
