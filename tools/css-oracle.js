@@ -13,12 +13,17 @@
 const { chromium } = require('playwright');
 const path = require('path'), fs = require('fs');
 
+/* Sans le try/catch, l'absence de /opt/pw-browsers faisait planter l'outil au
+   lieu de laisser Playwright utiliser son navigateur par défaut. */
 const CHROME = process.env.CHROMIUM_PATH || (() => {
   const root = '/opt/pw-browsers';
-  for (const d of fs.readdirSync(root).filter(n => n.startsWith('chromium-')).sort().reverse()) {
-    const p = path.join(root, d, 'chrome-linux', 'chrome');
-    if (fs.existsSync(p)) return p;
-  }
+  try {
+    for (const d of fs.readdirSync(root).filter(n => n.startsWith('chromium-')).sort().reverse()) {
+      const p = path.join(root, d, 'chrome-linux', 'chrome');
+      if (fs.existsSync(p)) return p;
+    }
+  } catch (e) {}
+  return undefined;
 })();
 
 const SH = fs.readFileSync(path.join(__dirname, 'shots.js'), 'utf8');
@@ -73,9 +78,12 @@ const ETATS = {
                          renderPrepTab(document.getElementById('canvas')); },
 
   /* Stock insuffisant + cases cochées : les variantes d'état des cartes. */
+  /* La cle d'une carte est « g-<nom en minuscules> », pas un index : avec
+     'g-0' la variante cochee n'etait jamais rendue, et l'etat ne couvrait rien. */
   prepaCochee:   () => { window.__prepRestore({ plates:9, mode:'serial', excess:10, minPrep:20, maxPrep:50,
-                           minPip:1, load:2, tubesOv:{}, norm:null, sources:[], checks:{'g-0':true},
-                           excluded:{}, spotChoice:{}, linkChoice:{},
+                           minPip:1, load:2, tubesOv:{}, norm:null, sources:[],
+                           checks:{'g-docetaxel':true}, excluded:{},
+                           spotChoice:{}, linkChoice:{},
                            fluids:[{drug:'Docetaxel',dil:'mère',load:400},
                                    {drug:'Paclitaxel',dil:'1:4',load:400}] });
                          renderPrepTab(document.getElementById('canvas')); },

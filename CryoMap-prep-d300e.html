@@ -4957,10 +4957,16 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 .rd-row.focus .rd-name{border-color:var(--accent);box-shadow:0 0 0 2px var(--ok-soft)}
 /* Ce que le run demande vraiment, sous la recette d'un lot. La recette est un
    modele ; ces chiffres-la suivent le nombre d'exemplaires du protocole. */
-.rd-run{grid-column:1/-1;display:grid;align-items:center;
+/* Meme gabarit ET meme gouttiere que .rd-row, sans marge interieure laterale :
+   toute difference decale les chiffres par rapport aux champs qu'ils doublent,
+   ce qui est exactement ce que cette ligne doit eviter. Le fond est pose par
+   un calque derriere, pour ne pas toucher a la grille. */
+.rd-run{grid-column:1/-1;display:grid;align-items:center;position:relative;
   grid-template-columns:minmax(120px,1.6fr) repeat(4,minmax(64px,1fr)) minmax(84px,1fr) 24px;
-  gap:8px;margin-top:3px;padding:5px 0 5px 9px;border-radius:var(--r-xs);
-  background:var(--ok-soft);font-size:12px;color:var(--ink-2)}
+  gap:6px;margin-top:3px;padding:5px 0;font-size:12px;color:var(--ink-2)}
+.rd-run::before{content:"";position:absolute;inset:0 -8px;border-radius:var(--r-xs);
+  background:var(--ok-soft);z-index:0}
+.rd-run>*{position:relative;z-index:1}
 .rd-run-k{font-family:var(--mono);font-weight:700;font-size:12.5px;color:var(--ink-1)}
 .rd-run-k em{font-style:normal;font-weight:600;font-size:11px;color:var(--ink-3)}
 .rd-run-v{font-family:var(--mono);font-weight:700;color:var(--ink-1)}

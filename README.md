@@ -90,7 +90,7 @@ saisie dans les Préférences).
 | `out/cryomap-demo.mp4` | la vidéo |
 | `tests/regression.js` | 100 cas de régression |
 | `tests/fake-firestore.js` | Firestore en mémoire, avec écoute temps réel |
-| `tests/shots.sha256` | empreintes des 27 captures de référence |
+| `tests/shots.sha256` | empreintes des 33 captures de référence |
 | `tools/shots.js` | les captures |
 | `tools/shots-check.js` | comparaison aux empreintes |
 | `tools/css-oracle.js` | « ces deux fichiers rendent-ils la même chose ? » |
@@ -236,20 +236,27 @@ variante du fichier, sans toucher au harnais.
 ### Garde-fou visuel
 
 ```bash
-npm run shots         # 27 captures (9 vues x 3 largeurs) dans out/shots
+npm run shots         # 33 captures (11 vues x 3 largeurs) dans out/shots
 npm run shots:check   # les compare aux empreintes de tests/shots.sha256
 npm run shots:ref     # régénère les empreintes, après vérification à l'œil
 ```
 
 Le CSS pèse ~4 800 lignes et repose sur beaucoup de `!important` : le modifier
 à l'aveugle était risqué. Ces empreintes transforment « risqué » en
-« vérifiable » — toute règle qui déplace un pixel, dans l'une des neuf vues et
+« vérifiable » — toute règle qui déplace un pixel, dans l'une des onze vues et
 à l'une des trois largeurs (1440 / 880 / 420 px, choisies de part et d'autre
 des points de rupture), est signalée nommément.
 
 Les captures sont déterministes : même jeu de données figé, mêmes dates, aucun
 identifiant aléatoire. Deux exécutions successives donnent des fichiers
 identiques au pixel près.
+
+**Deux des onze vues rendent l'onglet Prépa chargé** — un run avec dilutions en
+série et normalisation, un run à appariement approché. Elles ont été ajoutées
+après coup : les captures rendaient l'onglet vide, où ni les cartes « À sortir »
+ni la section des dilutions n'existent. La vérification était donc exacte et
+sans portée sur la partie réellement utilisée, et un décalage de 14 px y est
+passé. Toute vue ajoutée doit être chargée, pas seulement ouverte.
 
 ### Nettoyage du CSS, mesuré
 
@@ -261,27 +268,25 @@ node tools/css-bisect.js [--ecrire]
 `tools/css-oracle.js` répond à une seule question : **deux versions du fichier
 rendent-elles exactement la même chose ?** Il relève, pour chaque élément de
 chaque état à chaque largeur, sa boîte et la valeur calculée de toutes les
-propriétés concernées. `css-bisect` s'en sert pour retirer les `!important`
-un lot à la fois : un lot qui passe est adopté en bloc, un lot qui échoue est
-coupé en deux jusqu'à isoler les déclarations réellement utiles.
+propriétés concernées. `css-bisect` s'en sert pour retirer les `!important` :
+il n'ajoute un lot de candidats que si l'ensemble déjà retenu **plus** ce lot
+passe l'oracle, et coupe en deux un lot qui échoue.
 
-Résultat mesuré : **155 des 1 002 `!important` retirés** en 75 essais, sans le
-moindre écart ; 12 candidats conservés parce qu'ils changent vraiment quelque
-chose — dont `.freezer-grid { gap: 14px !important }`, sans lequel la grille
-de l'aperçu se décale de 4 px. S'y ajoutent **50 règles mortes supprimées** et
-18 listes de sélecteurs élaguées (31 classes citées par le CSS n'existent nulle
-part ailleurs dans le fichier), soit 5,9 Ko.
+Cette accumulation validée n'est pas un détail. Une première version validait
+chaque moitié séparément puis réunissait les résultats : deux retraits
+inoffensifs isolément peuvent se combiner en une régression, et c'est ainsi
+qu'un décalage de la préparation des dilutions est arrivé jusqu'à
+l'utilisateur. L'ensemble final doit avoir été éprouvé **en entier**.
 
-Les 847 `!important` restants ne sont pas du bruit : ils portent en majorité
-sur `background`, `color`, `padding`, `border`, `width` et `font-size`, où des
-règles concurrentes se disputent réellement le même élément. Les retirer
-demanderait de restructurer la cascade — une refonte, pas un nettoyage.
+**État actuel : aucun `!important` retiré.** Le nettoyage mené avec la
+première version de l'outillage a été annulé (commit `c019210`) pour cette
+raison. L'outillage est corrigé ; la recherche reste à relancer.
 
-> Une première tentative avait basculé les `!important` via le CSSOM plutôt que
-> dans le texte du fichier. Cette méthode déclarait inoffensives des
-> modifications qui ne l'étaient pas : c'est la comparaison de captures qui a
-> rattrapé l'erreur. D'où l'oracle actuel, qui mesure toujours le rendu réel
-> d'un fichier réellement modifié.
+Ce qui avait été mesuré, et reste vrai, sur les 1 002 déclarations :
+`background`, `color`, `padding`, `border`, `width` et `font-size` en portent
+la majorité, et des règles concurrentes s'y disputent réellement le même
+élément. Les retirer demanderait de restructurer la cascade — une refonte, pas
+un nettoyage.
 
 ### Compatibilité navigateurs
 

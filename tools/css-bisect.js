@@ -124,26 +124,25 @@ const construire = (src, plages, retirer) => {
     return ok;
   };
 
-  async function chercher(idx) {
-    if (!idx.length) return [];
-    if (await passe(idx)) return idx;
-    if (idx.length === 1) return [];
-    const m = idx.length >> 1;
-    return (await chercher(idx.slice(0, m))).concat(await chercher(idx.slice(m)));
-  }
+  /* Accumulation validée : on n'ajoute un lot de candidats que si l'ensemble
+     DÉJÀ retenu PLUS ce lot passe l'oracle. Un lot qui échoue est coupé en
+     deux et retenté de la même façon.
 
-  /* `chercher` valide chaque moitié SÉPARÉMENT : deux retraits inoffensifs
-     isolément peuvent se combiner en une régression. L'union doit donc être
-     éprouvée à son tour, et la recherche reprise tant qu'elle ne tient pas.
-     Sans ce tour de contrôle, un décalage de la section « Préparer les
-     dilutions » est passé au travers. */
-  let gardables = plages.map((_, k) => k);
-  for (let tour = 1; ; tour++) {
-    gardables = await chercher(gardables);
-    if (!gardables.length) break;
-    console.log('  — tour ' + tour + ' : vérification de l’union des ' + gardables.length + ' retraits');
-    if (await passe(gardables)) break;
+     Deux retraits inoffensifs isolément peuvent se combiner en une régression :
+     valider chaque moitié séparément puis réunir les résultats, comme le
+     faisait la version précédente, laisse donc passer des écarts — c'est ainsi
+     qu'un décalage de la section « Préparer les dilutions » est arrivé jusqu'à
+     l'utilisateur. Ici, `base` n'est jamais autre chose qu'un ensemble déjà
+     éprouvé EN ENTIER, donc le résultat final l'est aussi. */
+  async function accepter(base, idx) {
+    if (!idx.length) return base;
+    const essai = base.concat(idx);
+    if (await passe(essai)) return essai;
+    if (idx.length === 1) return base;          // ce retrait-là ne tient pas
+    const m = idx.length >> 1;
+    return accepter(await accepter(base, idx.slice(0, m)), idx.slice(m));
   }
+  const gardables = await accepter([], plages.map((_, k) => k));
   await browser.close();
 
   console.log('\n' + gardables.length + ' / ' + plages.length + ' `!important` retirables sans le moindre écart');

@@ -16,12 +16,17 @@ const path = require('path'), fs = require('fs');
 
 const APP_FILE = process.argv[2] || 'CryoMap-prep-d300e.html';
 const APP = 'file://' + path.resolve(__dirname, '..', APP_FILE);
+/* Sans le try/catch, l'absence de /opt/pw-browsers faisait planter l'outil au
+   lieu de laisser Playwright utiliser son navigateur par défaut. */
 const CHROME = process.env.CHROMIUM_PATH || (() => {
   const root = '/opt/pw-browsers';
-  for (const d of fs.readdirSync(root).filter(n => n.startsWith('chromium-')).sort().reverse()) {
-    const p = path.join(root, d, 'chrome-linux', 'chrome');
-    if (fs.existsSync(p)) return p;
-  }
+  try {
+    for (const d of fs.readdirSync(root).filter(n => n.startsWith('chromium-')).sort().reverse()) {
+      const p = path.join(root, d, 'chrome-linux', 'chrome');
+      if (fs.existsSync(p)) return p;
+    }
+  } catch (e) {}
+  return undefined;
 })();
 
 const SEED = () => {
