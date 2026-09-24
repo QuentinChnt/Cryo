@@ -969,10 +969,12 @@ const SEED = `(() => {
     check('re-dilutions : un seul exemplaire affiche la recette telle quelle',
       /10 µL stock/.test(calc.totaux || '') && /70 µL diluant/.test(calc.totaux || '')
       && /80 µL/.test(calc.totaux || '') && !/×/.test(calc.badge || ''), calc);
-    // 200 µL demandés, un exemplaire n'en prépare que 80 : on le signale au
-    // lieu de gonfler le compte dans le dos de l'opérateur.
+    // 200 µL demandés par le Tecan, un exemplaire n'en prépare que 80 : on le
+    // signale au lieu de gonfler le compte dans le dos de l'opérateur. Le
+    // chiffre annoncé est le besoin STRICT (200), pas le besoin majoré de la
+    // marge de confort (220) — sinon l'alerte se déclenche pour rien.
     check('re-dilutions : un volume insuffisant est signalé, pas compensé en silence',
-      /220/.test(calc.court || ''), calc);
+      /il en faut 200 µL/.test(calc.court || ''), calc);
     // Les tubes restent comptés sur le STOCK consommé (10 µL), pas sur les 80 µL
     // de solution finale : un seul aliquot de 30 µL suffit.
     check('re-dilutions : les tubes sont comptés sur le stock consommé, pas sur le volume final',
@@ -1048,10 +1050,36 @@ const SEED = `(() => {
       document.querySelectorAll('#sidePanelModal').forEach(m => m.classList.remove('show'));
       return out;
     });
-    // 200 µL + 10 % de marge = 220 µL demandés, la recette n'en fait que 80.
     check('re-dilutions : une ligne rouge écrit le volume qui manque',
-      manque.rouge === true && /220 µL/.test(manque.message || '')
+      manque.rouge === true && /200 µL/.test(manque.message || '')
       && /80 µL/.test(manque.message || ''), manque);
+
+    /* Le cas signalé par l'utilisateur : le Tecan demande 75,9 µL, un lot en
+       fait 80. Il y a de quoi — l'alerte ne doit PAS se déclencher. Elle le
+       faisait parce qu'elle comparait à 83,5 µL, soit 75,9 majorés de la marge
+       de confort du run. */
+    const suffit = await page.evaluate(async () => {
+      const T = e => e ? e.textContent.replace(/\s+/g,' ').trim() : null;
+      window.__prepRestore({ plates:1, mode:'serial', excess:10, minPrep:20, maxPrep:50, minPip:1,
+        load:2, tubesOv:{}, norm:null, checks:{}, excluded:{}, spotChoice:{}, linkChoice:{},
+        sources:[{ id:'s1', name:'a.tdd', n:1, copies:1, norm:null }],
+        fluids:[{ drug:'Docetaxel', dil:'mère', load:75.9, src:'a.tdd', srcId:'s1' }] });
+      renderPrepTab(document.getElementById('canvas'));
+      await new Promise(r => setTimeout(r, 700));
+      const c = document.querySelector('#p-grab .p-grab:not(.p-veh)');
+      const alerteCarte = T(c && c.querySelector('.p-redil-short'));
+      const b = document.querySelector('#p-grab .p-redil-badge'); if (b) b.click();
+      await new Promise(r => setTimeout(r, 500));
+      const row = document.querySelector('#sidePanelModal .rd-run');
+      const out = { alerteCarte, rouge: !!document.querySelector('#sidePanelModal .rd-run.court'),
+                    note: T(row && row.querySelector('.rd-run-note')) };
+      document.querySelectorAll('#sidePanelModal').forEach(m => m.classList.remove('show'));
+      return out;
+    });
+    check('re-dilutions : 75,9 µL demandés et 80 µL préparés ne déclenchent pas d’alerte',
+      suffit.rouge === false && suffit.alerteCarte === null, suffit);
+    check('re-dilutions : la marge non couverte est dite, sans alarme',
+      /75\.9 µL/.test(suffit.note || '') && /83\.49 µL/.test(suffit.note || ''), suffit);
     await page.context().close();
   }
 
