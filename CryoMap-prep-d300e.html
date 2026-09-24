@@ -4982,7 +4982,6 @@ header.topbar>#syncStatus,header.topbar .sync-status{margin:0!important;padding:
 .rd-run-msg{grid-column:1/-1;margin-top:4px;font-size:11.5px;line-height:1.45;
   color:var(--danger);font-family:inherit}
 .rd-run-msg b{font-family:var(--mono);font-weight:700}
-.rd-run-note{grid-column:1/-1;margin-top:4px;font-size:11px;line-height:1.4;color:var(--ink-4)}
 .rd-empty{font-size:12.5px;color:var(--ink-3);margin:8px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rd-actions{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
 #sidePanelModal .modal{max-width:760px!important}
@@ -15083,14 +15082,13 @@ function deleteLiveZone(freezerId, zoneId){
        Il porte deja les exemplaires du protocole : doubler un .tdd double ce
        volume, donc le nombre de lots et les quantites a preparer. C'est ce que
        la fenetre doit montrer — la recette, elle, reste celle d'UN lot. */
-    /* `besoin` est ce que le Tecan réclame STRICTEMENT ; `avecMarge` y ajoute la
-       marge de confort du run. L'alerte se juge sur le premier — sinon 75,9 µL
-       passaient pour 83,5 et un lot de 80 µL semblait insuffisant. */
+    /* `besoin` est ce que le Tecan réclame, sans la marge de confort du run :
+       le volume final d'une recette de pré-dilution porte déjà la marge que
+       l'opérateur a choisie, l'ajouter une seconde fois n'aurait pas de sens. */
     var duRun={};
     try{ groupResults().forEach(function(g){
       if(g && g.mother && g.mother.used>0)
         duRun[normDrug(g.name)]={besoin:(g.mother.usedRaw!=null?g.mother.usedRaw:g.mother.used),
-                                 avecMarge:g.mother.used,
                                  runs:Math.max(1,Number(g.runs)||1)}; }); }catch(e){}
     function pourLeRun(r){
       var e=duRun[normDrug(r.name||"")];
@@ -15099,11 +15097,10 @@ function deleteLiveZone(freezerId, zoneId){
       if(!(c.fv>0) || !(dv>0)) return null;          // recette incomplete
       var n=e.runs;                                  // exemplaires du run, pas un compte de lots
       var tot=n*c.fv;
-      return {besoin:e.besoin, avecMarge:e.avecMarge, runs:n, stock:n*dv,
+      return {besoin:e.besoin, runs:n, stock:n*dv,
               pbs:n*(num(r.p)||0), tween:n*(num(r.t)||0),
               diluant:n*((num(r.p)||0)+(num(r.t)||0)), total:tot,
-              court:(tot < e.besoin-1e-9),
-              serre:(tot >= e.besoin-1e-9 && tot < e.avecMarge-1e-9)};
+              court:(tot < e.besoin-1e-9)};
     }
     /* Les quantites a preparer, alignees SOUS les colonnes de la recette : la
        recette reste celle d'un lot (modifiable), la ligne du dessous donne ce
@@ -15114,11 +15111,9 @@ function deleteLiveZone(freezerId, zoneId){
       if(!q) return '';
       var mL=' <small>µL</small>';
       var titre=en
-        ? ('Loaded '+q.runs+' time(s) in this run. The Tecan needs '+fmtP(q.besoin)+' µL of working solution ('
-           + fmtP(q.avecMarge)+' µL with the run margin)'
+        ? ('Loaded '+q.runs+' time(s) in this run. The Tecan needs '+fmtP(q.besoin)+' µL of working solution'
            + (q.court?' — MORE than these '+fmtP(q.total)+' µL.':'.'))
-        : ('Chargé '+q.runs+' fois dans ce run. Le Tecan demande '+fmtP(q.besoin)+' µL de solution de travail ('
-           + fmtP(q.avecMarge)+' µL avec la marge du run)'
+        : ('Chargé '+q.runs+' fois dans ce run. Le Tecan demande '+fmtP(q.besoin)+' µL de solution de travail'
            + (q.court?(' — PLUS que ces '+fmtP(q.total)+' µL.'):'.'));
       return '<div class="rd-run'+(q.court?' court':'')+'" title="'+esc(titre)+'">'
         + '<span class="rd-run-k">\u00d7'+q.runs+' <em>'+(en?(q.runs>1?"runs":"run"):(q.runs>1?"exemplaires":"exemplaire"))+'</em></span>'
@@ -15137,16 +15132,7 @@ function deleteLiveZone(freezerId, zoneId){
                 : ('Le Tecan demande <b>'+fmtP(q.besoin)+' µL</b> de solution de travail ; \u00d7'+q.runs
                    +' la recette n\'en fait que '+fmtP(q.total)+' µL. Augmente le volume de la recette, ou le nombre d\'exemplaires.'))
                +'</span>')
-            : (q.serre
-              /* Le compte y est, mais sans la marge de confort : information,
-                 pas alerte — c'est la marge qui saute, pas le run. */
-              ? ('<span class="rd-run-note">'+(en
-                  ? ('Enough for the '+fmtP(q.besoin)+' µL the Tecan needs; the '+fmtP(q.avecMarge)
-                     +' µL including the run margin would need one more.')
-                  : ('De quoi couvrir les '+fmtP(q.besoin)+' µL demandés par le Tecan ; les '+fmtP(q.avecMarge)
-                     +' µL marge comprise en demanderaient un de plus.'))
-                 +'</span>')
-              : ''))
+            : '')
         + '</div>';
     }
     function paint(){
@@ -15372,17 +15358,14 @@ function deleteLiveZone(freezerId, zoneId){
       var _n=Math.max(1, Math.round(Number(runs)||1));
       var stockUsed=_n*_dv, madeVol=_n*_fv;
       consumeVol=stockUsed;
-      /* L'alerte compare au besoin STRICT du Tecan, pas au besoin majoré de la
-         marge de confort. Les charges du .tdd sont déjà ce que le dispenseur
-         réclame ; y rajouter les 10 % puis crier au manque faisait passer
-         75,9 µL pour 83,5 µL et allumait le rouge alors qu'un lot de 80 µL
-         suffit. La marge reste appliquée au calcul, elle ne déclenche plus
-         d'alarme à elle seule. */
+      /* Le volume final d'une recette de pre-dilution est celui que l'operateur
+         a decide de preparer : sa marge y est deja. On ne le compare donc qu'au
+         besoin STRICT du Tecan. Comparer a ce besoin majore de la marge du run
+         revenait a compter la marge deux fois : 75,9 µL devenaient 83,5 µL et
+         un lot de 80 µL passait pour insuffisant. */
       var _brut=(mother.usedRaw!=null)?mother.usedRaw:mother.used;
       redilInfo={recipe:redil, runs:_n, stockUsed:stockUsed, madeVol:madeVol,
-                 besoin:_brut, besoinMarge:mother.used,
-                 court:(madeVol < _brut-1e-9),
-                 serre:(madeVol >= _brut-1e-9 && madeVol < mother.used-1e-9),
+                 besoin:_brut, court:(madeVol < _brut-1e-9),
                  workingLeftover:madeVol-_brut};
     }
     var tubes=aliquot?Math.max(1,Math.ceil(consumeVol/aliquot)):null;
@@ -15650,8 +15633,8 @@ function deleteLiveZone(freezerId, zoneId){
            au lieu d'augmenter le multiplicateur dans le dos de l'opérateur. */
         var _court=r.redil.court
           ? ' <span class="p-redil-short" title="'+esc(en
-              ? ('The Tecan needs '+fmtP(r.redil.besoin)+' µL of working solution ('+fmtP(r.redil.besoinMarge)+' µL with the run margin); '+_nb+' \u00d7 the recipe makes '+fmtP(_totF)+' µL. Increase the recipe volume or the number of copies.')
-              : ('Le Tecan demande '+fmtP(r.redil.besoin)+' µL de solution de travail ('+fmtP(r.redil.besoinMarge)+' µL avec la marge du run) ; '+_nb+' \u00d7 la recette en fait '+fmtP(_totF)+' µL. Augmente le volume de la recette ou le nombre d\'exemplaires.'))
+              ? ('The Tecan needs '+fmtP(r.redil.besoin)+' µL of working solution; '+_nb+' \u00d7 the recipe makes '+fmtP(_totF)+' µL. Increase the recipe volume or the number of copies.')
+              : ('Le Tecan demande '+fmtP(r.redil.besoin)+' µL de solution de travail ; '+_nb+' \u00d7 la recette en fait '+fmtP(_totF)+' µL. Augmente le volume de la recette ou le nombre d\'exemplaires.'))
             +'">\u26a0 '+(en?('needs '+fmtP(r.redil.besoin)+' µL'):('il en faut '+fmtP(r.redil.besoin)+' µL'))+'</span>'
           : '';
         sub+=' <span class="p-redil-badge" data-redil="'+esc(r.name)+'" title="'+esc(_rtitle)+'">⚗ '+(en?"redilute":"rediluer")+(_nb>1?(' ×'+_nb):'')+'</span>'

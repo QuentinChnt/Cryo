@@ -1076,10 +1076,11 @@ const SEED = `(() => {
       document.querySelectorAll('#sidePanelModal').forEach(m => m.classList.remove('show'));
       return out;
     });
-    check('re-dilutions : 75,9 µL demandés et 80 µL préparés ne déclenchent pas d’alerte',
-      suffit.rouge === false && suffit.alerteCarte === null, suffit);
-    check('re-dilutions : la marge non couverte est dite, sans alarme',
-      /75\.9 µL/.test(suffit.note || '') && /83\.49 µL/.test(suffit.note || ''), suffit);
+    // Rien du tout : ni rouge, ni note. Le volume final d'une recette porte déjà
+    // la marge choisie par l'opérateur ; la comparer à celle du run la compterait
+    // deux fois.
+    check('re-dilutions : 75,9 µL demandés et 80 µL préparés ne disent rien',
+      suffit.rouge === false && suffit.alerteCarte === null && suffit.note === null, suffit);
     await page.context().close();
   }
 
